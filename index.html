@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova Capa – Capacités gaz Natran</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22%231e3872%22/%3E%3Crect%20x%3D%2211%22%20y%3D%2238%22%20width%3D%228%22%20height%3D%2214%22%20fill%3D%22%23fff%22/%3E%3Crect%20x%3D%2223%22%20y%3D%2230%22%20width%3D%228%22%20height%3D%2222%22%20fill%3D%22%23fff%22/%3E%3Crect%20x%3D%2235%22%20y%3D%2235%22%20width%3D%228%22%20height%3D%2217%22%20fill%3D%22%23fff%22/%3E%3Crect%20x%3D%2247%22%20y%3D%2224%22%20width%3D%228%22%20height%3D%2228%22%20fill%3D%22%23fff%22/%3E%3Cpath%20d%3D%22M8%2022c6-10%2010-10%2016%200s10%2010%2016%200%2010-10%2016%200%22%20fill%3D%22none%22%20stroke%3D%22%2373bc65%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22butt%22/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: saisie à gauche (site, journée, programme horaire), résultat collant à droite (quantités, prix, mail). */
+:root{
+  --bg:#f3f6fa; --panel:#ffffff; --ink:#1a1a2e; --muted:#5b6478; --line:#d3dbe8;
+  --accent:#1e3872; --accent-ink:#ffffff; --soft:#e6edf7; --green:#73bc65; --orange:#f5a623;
+  --warn:#9a5b00; --warn-bg:#fdf1dc; --ok:#1d6b3f; --ok-bg:#e2f3e8; --bad:#a3271f; --bad-bg:#fbe6e3;
+  --font:Ubuntu,"Segoe UI",Arial,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Ubuntu Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0f1a33; --panel:#16254a; --ink:#e8eef8; --muted:#9fb0cc; --line:#2b3d6b;
+    --accent:#b9cde5; --accent-ink:#1e3872; --soft:#22366a; --green:#73bc65; --orange:#f5a623;
+    --warn:#f0b65a; --warn-bg:#3a2c12; --ok:#74d39b; --ok-bg:#16321f; --bad:#ff9d94; --bad-bg:#3d1b18;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f1a33; --panel:#16254a; --ink:#e8eef8; --muted:#9fb0cc; --line:#2b3d6b;
+  --accent:#b9cde5; --accent-ink:#1e3872; --soft:#22366a; --green:#73bc65; --orange:#f5a623;
+  --warn:#f0b65a; --warn-bg:#3a2c12; --ok:#74d39b; --ok-bg:#16321f; --bad:#ff9d94; --bad-bg:#3d1b18;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45}
+.wrap{max-width:1280px;margin:0 auto;padding:20px 16px 48px}
+header{border-bottom:3px solid var(--green);padding-bottom:12px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;margin-bottom:16px}
+h1{font-size:24px;font-weight:700;color:var(--accent);margin:0;text-wrap:balance}
+header p{margin:0;color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:980px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.sticky{position:sticky;top:12px}
+@media (max-width:980px){.sticky{position:static}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:0;padding:16px;min-width:0}
+h2{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+input,select,textarea,button{font:inherit;color:inherit}
+input[type=text],input[type=number],input[type=date],select,textarea{
+  background:var(--bg);border:1px solid var(--line);border-radius:0;padding:7px 8px;color:var(--ink);width:100%;min-width:0}
+input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
+textarea{resize:vertical;min-height:56px;font-size:13px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:0;padding:7px 12px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.ghost{border-color:transparent;color:var(--muted);padding:4px 8px}
+button:disabled{opacity:.55;cursor:default}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:14px}
+.check input{margin-top:3px}
+.radio-set{display:flex;flex-direction:column;gap:6px;margin:8px 0 0 26px}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+.asset{border:1px solid var(--line);border-radius:0;padding:12px;display:flex;flex-direction:column;gap:10px}
+.asset + .asset{margin-top:12px}
+.asset-head{display:grid;grid-template-columns:minmax(120px,2fr) repeat(2,minmax(90px,1fr)) auto;gap:10px;align-items:end}
+@media (max-width:560px){.asset-head{grid-template-columns:1fr 1fr}}
+.scroll{overflow-x:auto}
+table.hours{border-collapse:collapse;font-family:var(--mono);font-size:12px}
+table.hours th{font-weight:500;color:var(--muted);padding:2px 2px 4px;text-align:center}
+table.hours td{padding:1px}
+table.hours input{width:46px;padding:5px 2px;text-align:center;font-size:12px}
+table.hours input.on{background:var(--soft);border-color:var(--accent)}
+.fill{font-size:13px;color:var(--muted)}
+.fill select,.fill input{width:auto}
+.fill input{width:76px}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tile{border:1px solid var(--line);border-radius:0;padding:10px 12px}
+.tile.key{background:var(--soft);border-color:var(--accent)}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font-family:var(--mono);font-size:24px;font-weight:500;font-variant-numeric:tabular-nums}
+.tile .u{font-size:12px;color:var(--muted)}
+.chart{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:end;height:96px;margin-top:14px;position:relative;border-bottom:1px solid var(--line)}
+.bar{background:var(--accent);border-radius:0;min-height:0}
+.bar.zero{background:var(--line);height:2px}
+.cap{position:absolute;left:0;right:0;border-top:1px dashed var(--warn);pointer-events:none}
+.axis{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;margin-top:3px}
+.legend{font-size:12px;color:var(--muted);margin-top:6px}
+.lim{position:absolute;left:0;right:0;border-top:2px solid var(--bad);pointer-events:none}
+.legend i.l2{border-top:2px solid var(--bad)}
+.curve input{width:70px}
+.legend i{display:inline-block;width:18px;border-top:1px dashed var(--warn);vertical-align:middle;margin-right:4px}
+table.price{width:100%;border-collapse:collapse;font-size:14px}
+table.price td{padding:6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+table.price td:last-child{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:12px}
+table.price tr.total td{font-weight:600;border-bottom:0;font-size:16px}
+table.price small{display:block;color:var(--muted);font-size:12px}
+.share{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;margin-top:14px;padding:10px 12px;border-radius:0;background:var(--soft);font-size:13px}
+.share.dirty{background:var(--warn-bg);color:var(--warn)}
+.pill{display:inline-block;font-size:12px;border-radius:0;padding:2px 9px;background:var(--warn-bg);color:var(--warn);font-weight:500}
+.note{font-size:12px;border-radius:0;padding:8px 10px;margin-top:10px}
+.note.warn{background:var(--warn-bg);color:var(--warn)}
+.note.ok{background:var(--ok-bg);color:var(--ok)}
+.note.bad{background:var(--bad-bg);color:var(--bad)}
+.mail{border:1px solid var(--line);border-radius:0;padding:12px;background:var(--bg);font-size:13px;overflow-x:auto}
+.mail .subj{font-weight:600;margin-bottom:8px}
+.mail table{border-collapse:collapse;margin:8px 0}
+.mail th,.mail td{border:1px solid var(--muted);padding:5px 8px;text-align:center}
+.mail th{font-weight:500}
+.mail p{margin:0 0 8px}
+details summary{cursor:pointer;color:var(--muted);font-size:13px}
+details[open] summary{margin-bottom:10px}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 style="display:flex;align-items:center;gap:12px"><span style="width:40px;height:40px;display:inline-block"><svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect width="64" height="64" fill="#1e3872"/><rect x="11" y="38" width="8" height="14" fill="#fff"/><rect x="23" y="30" width="8" height="22" fill="#fff"/><rect x="35" y="35" width="8" height="17" fill="#fff"/><rect x="47" y="24" width="8" height="28" fill="#fff"/><path d="M8 22c6-10 10-10 16 0s10 10 16 0 10-10 16 0" fill="none" stroke="#73bc65" stroke-width="5" stroke-linecap="butt"/></svg></span>Nova Capa <span style="font-weight:400;font-size:.6em;opacity:.7">Capacités gaz Natran</span></h1>
+    <p>Besoin journalier et horaire, prix de la capacité, mail au gas dispatching Axpo</p>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section>
+        <h2>Site et journée gazière</h2>
+        <div class="fields">
+          <label class="f">Site
+            <select id="siteSel"></select>
+          </label>
+          <label class="f">Nom du site (dans le mail)
+            <input type="text" id="siteName">
+          </label>
+          <label class="f">Code LI
+            <input type="text" id="siteLi">
+          </label>
+          <label class="f">NTR du point de livraison
+            <input type="number" id="siteNtr" min="0" max="10" step="1">
+          </label>
+          <label class="f">Journée gazière (6h → 6h)
+            <input type="date" id="gd">
+          </label>
+          <label class="f">Limite de capa horaire du LI (MWh/h, vide = aucune)
+            <input type="number" id="siteHmax" min="0" step="0.01">
+          </label>
+          <label class="f">Capa journalière déjà souscrite ce jour-là (MWh/j)
+            <input type="number" id="exD" min="0" step="1">
+          </label>
+          <label class="f">Capa horaire déjà souscrite ce jour-là (MWh/h)
+            <input type="number" id="exH" min="0" step="1">
+          </label>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button type="button" id="addSite">Ajouter un site</button>
+          <button type="button" class="ghost" id="delSite">Supprimer ce site</button>
+        </div>
+        <div class="share" id="shareBar">
+          <span id="shareMsg">Paramétrage partagé : chargement…</span>
+          <span class="row">
+            <button type="button" class="primary" id="shareSave" disabled>Enregistrer pour tous</button>
+            <button type="button" class="ghost" id="shareUndo" disabled>Annuler mes modifications</button>
+          </span>
+        </div>
+        <div id="loginBox" style="margin-top:10px;display:none">
+          <div class="fields">
+            <label class="f">Adresse e-mail professionnelle<input type="text" id="authMail" placeholder="prenom.nom@novawatt.com" autocomplete="email"></label>
+            <label class="f">Code reçu par e-mail (si le lien ne s'ouvre pas)<input type="text" id="authCode" placeholder="123456" autocomplete="one-time-code"></label>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button type="button" class="primary" id="authSend">Recevoir un lien de connexion</button>
+            <button type="button" class="ghost" id="authVerify">Valider le code</button>
+          </div>
+          <p class="hint" id="authMsg"></p>
+        </div>
+        <div class="row" id="logoutBox" style="margin-top:10px;display:none"><span class="hint" id="whoAmI"></span><button type="button" class="ghost" id="authOut">Se déconnecter</button></div>
+        <details style="margin-top:10px">
+          <summary>Connexion à la base (administration)</summary>
+          <div class="fields">
+            <label class="f">URL du projet<input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co"></label>
+            <label class="f">Clé publique (anon)<input type="text" id="sbKey"></label>
+          </div>
+          <div class="row" style="margin-top:10px"><button type="button" id="sbGo">Enregistrer</button></div>
+        </details>
+        <p class="hint">Sites, actifs, courbes de consommation, NTR, limite horaire, grille tarifaire et destinataires sont communs à tous les utilisateurs. Le programme horaire, la journée et les capacités déjà souscrites ce jour-là restent propres à chacun.</p>
+      </section>
+
+      <section>
+        <h2>Actifs et programme horaire (MW électriques)</h2>
+        <div id="assets"></div>
+        <div class="row" style="margin-top:12px">
+          <button type="button" id="addAsset">Ajouter un actif</button>
+        </div>
+        <div class="fields" style="margin-top:14px">
+          <label class="f">Marge de sécurité (%)
+            <input type="number" id="margin" min="0" max="50" step="1">
+          </label>
+        </div>
+        <p class="hint">Gaz (MWh PCS) = puissance électrique × consommation spécifique à la charge de l'heure, interpolée entre les points saisis (valeur du point le plus proche en dehors), plus le gaz de démarrage ajouté à la première heure de chaque séquence de marche (une marche dès 6h compte comme un démarrage). Les quantités demandées sont arrondies au MWh supérieur.</p>
+      </section>
+
+      <section>
+        <h2>Préavis</h2>
+        <label class="check"><input type="checkbox" id="sn"> <span>Capacité journalière prise en <b>préavis court</b></span></label>
+        <div class="radio-set" id="snSet">
+          <label class="check"><input type="radio" name="snLvl" id="sn20" value="20"> <span>Demande après J-2 ouvré 9h et avant J-1 20h : tarif +20 %</span></label>
+          <label class="check"><input type="radio" name="snLvl" id="sn30" value="30"> <span>Demande après J-1 20h et jusqu'à J 14h : tarif +30 %</span></label>
+        </div>
+        <p class="hint">Jusqu'à J-2 ouvré 9h, le tarif normal s'applique. Une capacité souscrite le jour J prend effet à 6h.</p>
+      </section>
+
+      <section>
+        <details>
+          <summary>Grille tarifaire ATRT8 utilisée (modifiable)</summary>
+          <div class="fields">
+            <label class="f">TCS, sortie réseau principal (€/MWh/j/an)
+              <input type="number" id="tcs" step="0.01">
+            </label>
+            <label class="f">TCR unitaire, × NTR (€/MWh/j/an)
+              <input type="number" id="tcr" step="0.01">
+            </label>
+            <label class="f">TCL, consommateur raccordé transport (€/MWh/j/an)
+              <input type="number" id="tcl" step="0.01">
+            </label>
+          </div>
+          <p class="hint">Valeurs NaTran du 01/04/2026 au 31/03/2027 (délibération CRE n° 2026-28). Capacité mensuelle : 4/12 du terme annuel en déc.–fév., 2/12 en mars et nov., 1/12 en avr.–juin et sept.–oct., 0,5/12 en juil.–août. Capacité quotidienne : 1/30 du terme mensuel. Supplément horaire au-delà de 1/20 : 10 × (TCL + TCR) quotidiens par MWh/h.</p>
+        </details>
+      </section>
+    </div>
+
+    <div class="col sticky">
+      <section>
+        <h2>Capacité à demander</h2>
+        <div class="tiles">
+          <div class="tile"><div class="k">Consommation de la journée</div><div class="v" id="oDay">0</div><div class="u">MWh PCS</div></div>
+          <div class="tile"><div class="k">Pointe horaire</div><div class="v" id="oPeak">0</div><div class="u">MWh PCS/h</div></div>
+          <div class="tile key"><div class="k">Capa journalière additionnelle</div><div class="v" id="oAddD">+0</div><div class="u">MWh/j</div></div>
+          <div class="tile key"><div class="k">Capa horaire totale à demander</div><div class="v" id="oTotH">0</div><div class="u" id="oTotHsub">MWh/h</div></div>
+        </div>
+        <div class="note bad" id="limWarn" hidden></div>
+        <div class="chart" id="chart"></div>
+        <div class="axis" id="axis"></div>
+        <div class="legend"><i></i>capacité horaire totale demandée · <i class="l2"></i>limite du LI · barres : gaz par heure (MWh PCS/h)</div>
+      </section>
+
+      <section>
+        <h2>Prix de la capacité <span class="pill" id="snPill" hidden></span></h2>
+        <table class="price">
+          <tbody>
+            <tr><td>Capacité journalière<small id="pDsub"></small></td><td id="pD">0 €</td></tr>
+            <tr><td>Supplément de capacité horaire<small id="pHsub"></small></td><td id="pH">0 €</td></tr>
+            <tr class="total"><td>Total journée gazière<small id="pTsub"></small></td><td id="pT">0 €</td></tr>
+          </tbody>
+        </table>
+        <div class="note warn" id="tarifWarn" hidden></div>
+      </section>
+
+      <section>
+        <h2>Mail au dispatching</h2>
+        <div class="fields">
+          <label class="f">Motif
+            <select id="reason">
+              <option value="tests performed">Essais (tests)</option>
+              <option value="sales performed on intraday market">Ventes intraday</option>
+              <option value="sales performed on day-ahead market">Ventes day-ahead</option>
+              <option value="balancing activations">Activations d'ajustement</option>
+            </select>
+          </label>
+          <label class="f">Signature
+            <input type="text" id="sign">
+          </label>
+          <label class="f">Jours suivants à +0
+            <input type="number" id="zeros" min="0" max="4" step="1">
+          </label>
+        </div>
+        <p class="hint">« (NEW!) » est ajouté à l'objet quand aucune capacité n'est déjà souscrite sur le site pour cette journée.</p>
+        <details style="margin-top:10px">
+          <summary>Destinataires</summary>
+          <label class="f">À<textarea id="to"></textarea></label>
+          <label class="f" style="margin-top:8px">Cc<textarea id="cc"></textarea></label>
+        </details>
+        <div class="mail" id="mail" style="margin-top:12px"></div>
+        <div class="row" style="margin-top:12px">
+          <button type="button" class="primary" id="draft">Ouvrir dans Outlook</button>
+          <button type="button" id="copy">Copier le mail mis en forme</button>
+        </div>
+        <div id="status" role="status" aria-live="polite"></div>
+        <p class="hint">Rien n'est envoyé par l'outil : le message s'ouvre dans Outlook web, vous relisez puis envoyez.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var KEY="capagaz.v2";
+var HOURS=[]; for(var i=0;i<24;i++){HOURS.push((i+6)%24);}
+var pad=function(n){return (n<10?"0":"")+n;};
+var $=function(id){return document.getElementById(id);};
+var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});};
+var num=function(v,d){var x=parseFloat(String(v).replace(",","."));return isFinite(x)?x:(d||0);};
+var fmt=function(x,d){return x.toLocaleString("fr-FR",{minimumFractionDigits:d||0,maximumFractionDigits:d||0});};
+var eur=function(x){return fmt(x,x<100?2:0)+" €";};
+
+function tomorrow(){var d=new Date();d.setDate(d.getDate()+1);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());}
+function zeros24(){var a=[];for(var i=0;i<24;i++)a.push(0);return a;}
+function defaults(){
+  var h=zeros24(); h[2]=45; h[3]=45; h[4]=45; // 8h-11h, exemple
+  return {
+    cur:0,
+    sites:[{name:"NovaWatt Haubourdin",li:"0343",ntr:3,hmax:144.45,exD:0,exH:0,
+      assets:[{name:"Haubourdin 45 MW",pmax:45,start:0,curve:[{load:100,cs:3.21}],h:h}]}],
+    gd:tomorrow(), margin:0, sn:false, snLvl:20,
+    tcs:127.80, tcr:99.12, tcl:39.44,
+    reason:"tests performed", sign:"", zeros:1,
+    to:"gasdispatching.ch@axpo.com; AxpoFR-FOSUPPORT@AXPO.COM",
+    cc:"Businessinvestigation.ch@axpo.com; guillaume.dupret@novawatt.com; charles.jacob@novawatt.com; marketops@novawatt.com; kevin.debode@novawatt.com; tristan.amirault@axpo.com; Louis.Chesneau@axpo.com; remi.sirand@axpo.com; Julya.Podgorna@axpo.com; axpo_balancing@axpo.com; Anne-Sophie.Barla@axpo.com"
+  };
+}
+var S=defaults();
+try{
+  var raw=localStorage.getItem(KEY);
+  if(raw){var o=JSON.parse(raw); if(o&&o.sites&&o.sites.length){var d=defaults(); for(var k in d){if(o[k]===undefined)o[k]=d[k];} o.gd=tomorrow(); S=o; if(S.cur>=S.sites.length)S.cur=0;}}
+}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function site(){return S.sites[S.cur];}
+
+function monthCoef(m){ // m = 1..12, part du terme annuel
+  if(m===12||m<=2)return 4/12;
+  if(m===3||m===11)return 2/12;
+  if(m===7||m===8)return 0.5/12;
+  return 1/12;
+}
+function gdDate(){var p=String(S.gd||"").split("-");if(p.length!==3)return null;var d=new Date(+p[0],+p[1]-1,+p[2]);return isNaN(d)?null:d;}
+
+function csAt(a,p){ // consommation spécifique (MWh PCS/MWh élec) à la puissance p
+  var pm=num(a.pmax), c=(a.curve||[]).filter(function(q){return num(q.cs)>0;}).map(function(q){return {load:num(q.load),cs:num(q.cs)};}).sort(function(x,y){return x.load-y.load;});
+  if(!c.length)return 0;
+  var l=pm>0?p/pm*100:100;
+  if(l<=c[0].load)return c[0].cs;
+  for(var i=1;i<c.length;i++){ if(l<=c[i].load){var d=c[i].load-c[i-1].load; return d>0?c[i-1].cs+(l-c[i-1].load)/d*(c[i].cs-c[i-1].cs):c[i].cs;} }
+  return c[c.length-1].cs;
+}
+function compute(){
+  var st=site(), gasH=zeros24(), elec=0, starts=0;
+  st.assets.forEach(function(a){
+    for(var i=0;i<24;i++){var p=Math.max(0,num(a.h[i])); elec+=p; gasH[i]+=p*csAt(a,p);
+      if(p>0&&(i===0||num(a.h[i-1])<=0)){gasH[i]+=Math.max(0,num(a.start));starts++;}}
+  });
+  var day=gasH.reduce(function(s,x){return s+x;},0), peak=Math.max.apply(null,gasH);
+  var m=1+num(S.margin)/100;
+  var addD=Math.ceil(Math.max(0,day*m-num(st.exD))-1e-9);
+  var incl=addD/20;
+  var needH=Math.max(0,peak*m-num(st.exH));
+  var totH=Math.ceil(Math.max(needH,incl)-1e-9);
+  var supH=Math.max(0,totH-incl);
+  var d=gdDate(), coef=d?monthCoef(d.getMonth()+1):0;
+  var sn=S.sn?(1+num(S.snLvl,20)/100):1;
+  var reg=num(S.tcr)*num(st.ntr);
+  var uD=(num(S.tcs)+reg+num(S.tcl))*coef/30;
+  var uH=10*(num(S.tcl)+reg)*coef/30;
+  var lim=num(st.hmax), liH=num(st.exH)+totH;
+  return {starts:starts,lim:lim,liH:liH,over:lim>0&&liH>lim+1e-9,isNew:num(st.exD)===0&&num(st.exH)===0,
+    gasH:gasH,day:day,peak:peak,elec:elec,addD:addD,incl:incl,totH:totH,supH:supH,coef:coef,
+    uD:uD*sn,uH:uH*sn,cD:addD*uD*sn,cH:supH*uH*sn,base:addD*uD+supH*uH,sn:sn,date:d};
+}
+
+var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+function dm(d){return pad(d.getDate())+"/"+pad(d.getMonth()+1);}
+function mailParts(r){
+  var st=site(), d=r.date||new Date();
+  var label=esc(st.name)+" (LI "+esc(st.li)+")";
+  var subject="Daily and Hourly Capacity Request for "+st.name+" (LI "+st.li+") for GD "+dm(d)+"/"+d.getFullYear()+(r.isNew?" (NEW!)":"");
+  var rows=[[label,"<b>"+DAYS[d.getDay()]+" "+dm(d)+"</b>","<b>+"+r.addD+"</b>","<b>"+r.totH+"</b>"]];
+  for(var i=1;i<=Math.min(4,Math.max(0,Math.round(num(S.zeros))));i++){
+    var n=new Date(d.getFullYear(),d.getMonth(),d.getDate()+i);
+    rows.push([label,"<b>"+DAYS[n.getDay()]+" "+dm(n)+"</b>","<b>+0</b>","<b>+0</b>"]);
+  }
+  var head=["Site","Gas Day","Additional Daily Capacity MWh/d 0 deg C","<b>TOTAL</b> Hourly Capacity MWh/h 0 deg C (<b><i>if different from daily/20</i></b>)"];
+  var table="<table><thead><tr>"+head.map(function(h){return "<th>"+h+"</th>";}).join("")+"</tr></thead><tbody>"+
+    rows.map(function(rw){return "<tr>"+rw.map(function(c){return "<td>"+c+"</td>";}).join("")+"</tr>";}).join("")+"</tbody></table>";
+  var body="<p>Dear all,</p>"+
+    "<p>NovaWatt needs to book an additional daily and hourly capacity to cover the consumption of "+esc(S.reason)+" on GD <b>"+DAYS[d.getDay()]+" "+dm(d)+"/"+d.getFullYear()+"</b> on LI"+esc(st.li)+".</p>"+
+    "<p>Consequently, I ask you to book the following additional daily and hourly capacity:</p>"+
+    "<p>For the sake of clarity the last column is the <b>TOTAL HOURLY CAPACITY needed for the corresponding GD (1/20 of Daily + additional hourly)</b></p>"+
+    table+
+    "<p>Can you please confirm the booking ?</p>"+
+    "<p>Many thanks and best regards,</p>"+
+    (S.sign?"<p>"+esc(S.sign)+"</p>":"");
+  return {subject:subject,body:body};
+}
+
+function renderAssets(){
+  var st=site();
+  $("assets").innerHTML=st.assets.map(function(a,ai){
+    var opts=HOURS.map(function(h,i){return '<option value="'+i+'">'+pad(h)+'h</option>';}).join("");
+    var optsEnd=HOURS.map(function(h,i){return '<option value="'+(i+1)+'"'+(i===23?" selected":"")+'>'+pad((h+1)%24)+'h</option>';}).join("");
+    return '<div class="asset" data-a="'+ai+'">'+
+      '<div class="asset-head">'+
+        '<label class="f">Actif<input type="text" id="an'+ai+'" data-k="name" value="'+esc(a.name)+'"></label>'+
+        '<label class="f">Puissance max (MW)<input type="number" id="ap'+ai+'" data-k="pmax" min="0" step="0.1" value="'+esc(a.pmax)+'"></label>'+
+        '<label class="f">Gaz par démarrage (MWh PCS)<input type="number" id="ag'+ai+'" data-k="start" min="0" step="0.1" value="'+esc(num(a.start))+'"></label>'+
+        '<button type="button" class="ghost" data-act="del" aria-label="Supprimer cet actif">Supprimer</button>'+
+      '</div>'+
+      '<div class="row fill curve">Consommation spécifique : '+(a.curve||[]).map(function(q,qi){
+        return '<span class="row">à <input type="number" id="cl'+ai+'_'+qi+'" data-pt="'+qi+'" data-f="load" min="0" max="110" step="1" value="'+esc(q.load)+'" aria-label="Charge en %"> % : <input type="number" id="cc'+ai+'_'+qi+'" data-pt="'+qi+'" data-f="cs" min="0" step="0.01" value="'+esc(q.cs)+'" aria-label="MWh PCS par MWh électrique"> MWh PCS/MWh'+
+          ((a.curve.length>1)?' <button type="button" class="ghost" data-act="delpt" data-pt="'+qi+'" aria-label="Supprimer ce point">×</button>':'')+'</span>';
+      }).join("")+' <button type="button" data-act="addpt">Ajouter un point de charge</button></div>'+
+      '<div class="row fill">De <select id="af'+ai+'" aria-label="Heure de début">'+opts+'</select> à <select id="at'+ai+'" aria-label="Heure de fin">'+optsEnd+'</select> à <input type="number" id="aw'+ai+'" min="0" step="0.1" value="'+esc(a.pmax)+'" aria-label="Puissance en MW"> MW '+
+        '<button type="button" data-act="fill">Appliquer</button><button type="button" class="ghost" data-act="clear">Tout à zéro</button>'+
+        '<span id="as'+ai+'"></span></div>'+
+      '<div class="scroll"><table class="hours"><thead><tr>'+HOURS.map(function(h){return "<th>"+pad(h)+"</th>";}).join("")+'</tr></thead><tbody><tr>'+
+        a.h.map(function(v,i){return '<td><input type="number" id="h'+ai+'_'+i+'" data-h="'+i+'" min="0" step="0.1" value="'+esc(v)+'" class="'+(num(v)>0?"on":"")+'" aria-label="MW de '+pad(HOURS[i])+'h à '+pad((HOURS[i]+1)%24)+'h"></td>';}).join("")+
+      '</tr></tbody></table></div>'+
+    '</div>';
+  }).join("");
+}
+function renderSite(){
+  var st=site();
+  $("siteSel").innerHTML=S.sites.map(function(s,i){return '<option value="'+i+'"'+(i===S.cur?" selected":"")+'>'+esc(s.name)+' (LI '+esc(s.li)+')</option>';}).join("");
+  $("siteName").value=st.name; $("siteLi").value=st.li; $("siteNtr").value=st.ntr; $("siteHmax").value=(st.hmax===undefined||st.hmax===null||num(st.hmax)<=0)?"":st.hmax; $("exD").value=st.exD; $("exH").value=st.exH;
+  $("delSite").disabled=S.sites.length<2;
+  renderAssets();
+}
+function renderInputs(){
+  ["gd","margin","tcs","tcr","tcl","reason","sign","zeros","to","cc"].forEach(function(k){$(k).value=S[k];});
+  $("sn").checked=!!S.sn;
+  $("sn20").checked=+S.snLvl!==30; $("sn30").checked=+S.snLvl===30;
+}
+function update(){
+  var st=site(), r=compute();
+  $("snSet").style.display=S.sn?"flex":"none";
+  $("oDay").textContent=fmt(r.day,1); $("oPeak").textContent=fmt(r.peak,1);
+  $("oAddD").textContent="+"+fmt(r.addD); $("oTotH").textContent=fmt(r.totH);
+  $("oTotHsub").textContent="MWh/h = "+fmt(r.incl,1)+" inclus (1/20) + "+fmt(r.supH,1)+" de supplément";
+  var top=Math.max(r.totH,r.peak,r.lim,1);
+  var lw=$("limWarn"); lw.hidden=!r.over;
+  if(r.over)lw.textContent="La capacité horaire nécessaire sur le LI ("+fmt(r.liH)+" MWh/h) dépasse la limite du point de livraison ("+fmt(r.lim)+" MWh/h). Le mail est bloqué : réduisez la puissance ou étalez la marche.";
+  $("draft").disabled=r.over; $("copy").disabled=r.over; $("mail").style.opacity=r.over?".45":"";
+  if(r.over)status("bad","Mail bloqué : la demande dépasse la limite de capacité horaire du LI ("+fmt(r.lim)+" MWh/h).");
+  else if(wasOver)$("status").innerHTML="";
+  wasOver=r.over;
+  $("chart").innerHTML=r.gasH.map(function(g){return g>0?'<div class="bar" style="height:'+(g/top*100).toFixed(1)+'%" title="'+fmt(g,1)+' MWh/h"></div>':'<div class="bar zero"></div>';}).join("")+
+    (r.totH>0?'<div class="cap" style="bottom:'+(r.totH/top*100).toFixed(1)+'%"></div>':"")+
+    (r.lim>0?'<div class="lim" style="bottom:'+(r.lim/top*100).toFixed(1)+'%"></div>':"");
+  $("axis").innerHTML=HOURS.map(function(h){return "<span>"+pad(h)+"</span>";}).join("");
+  st.assets.forEach(function(a,ai){
+    var el=$("as"+ai), pm=num(a.pmax);
+    if(el)el.textContent="· pleine charge : "+fmt(pm*csAt(a,pm),1)+" MWh PCS/h";
+  });
+  var mois=r.date?r.date.toLocaleDateString("fr-FR",{month:"long"}):"";
+  $("snPill").hidden=!S.sn; $("snPill").textContent="préavis court +"+num(S.snLvl,20)+" %";
+  $("pD").textContent=eur(r.cD); $("pDsub").textContent=fmt(r.addD)+" MWh/j × "+fmt(r.uD,3)+" €/MWh/j (TCS + TCR×NTR + TCL, "+mois+")";
+  $("pH").textContent=eur(r.cH); $("pHsub").textContent=fmt(r.supH,1)+" MWh/h × "+fmt(r.uH,3)+" €/MWh/h (10 × (TCL + TCR×NTR))";
+  var tot=r.cD+r.cH;
+  $("pT").textContent=eur(tot);
+  $("pTsub").textContent=(r.day>0?fmt(tot/r.day,2)+" €/MWh PCS consommé · "+fmt(tot/r.elec,2)+" €/MWh électrique":"Aucune heure de marche saisie")+
+    (S.sn&&tot>0?" · dont "+eur(tot-r.base)+" de majoration préavis court":"");
+  var w=$("tarifWarn"), msg="";
+  if(r.date){var t=r.date.getTime(); if(t<new Date(2026,3,1).getTime()||t>new Date(2027,2,31).getTime())msg="Cette journée est hors de la grille du 01/04/2026 au 31/03/2027 : mettez à jour TCS, TCR et TCL.";}
+  w.hidden=!msg; w.textContent=msg;
+  var mp=mailParts(r);
+  $("mail").innerHTML='<div class="subj">'+esc(mp.subject)+'</div>'+mp.body;
+  save();
+}
+
+/* --- événements --- */
+var SHARED_KEYS={tcs:1,tcr:1,tcl:1,to:1,cc:1};
+function bind(id,key,isNum){ $(id).addEventListener("input",function(e){S[key]=isNum?num(e.target.value):e.target.value;if(SHARED_KEYS[key])markDirty();update();}); }
+bind("gd","gd"); bind("margin","margin",true); bind("tcs","tcs",true); bind("tcr","tcr",true); bind("tcl","tcl",true);
+bind("reason","reason"); bind("sign","sign"); bind("zeros","zeros",true); bind("to","to"); bind("cc","cc");
+$("sn").addEventListener("change",function(e){S.sn=e.target.checked;update();});
+$("sn20").addEventListener("change",function(){S.snLvl=20;update();});
+$("sn30").addEventListener("change",function(){S.snLvl=30;update();});
+function bindSite(id,key,isNum,local){ $(id).addEventListener("input",function(e){site()[key]=isNum?num(e.target.value):e.target.value; if(!isNum){var o=$("siteSel").options[S.cur]; if(o)o.textContent=site().name+" (LI "+site().li+")";} if(!local)markDirty(); update();}); }
+bindSite("siteName","name"); bindSite("siteLi","li"); bindSite("siteNtr","ntr",true); bindSite("siteHmax","hmax",true); bindSite("exD","exD",true,true); bindSite("exH","exH",true,true);
+$("siteSel").addEventListener("change",function(e){S.cur=+e.target.value;renderSite();update();});
+$("addSite").addEventListener("click",function(){S.sites.push({name:"Nouveau site",li:"0000",ntr:1,exD:0,exH:0,hmax:"",assets:[{name:"Actif 1",pmax:10,curve:[{load:100,cs:3}],h:zeros24()}]});S.cur=S.sites.length-1;markDirty();renderSite();update();$("siteName").focus();});
+$("delSite").addEventListener("click",function(){if(S.sites.length<2)return;S.sites.splice(S.cur,1);S.cur=0;markDirty();renderSite();update();});
+$("addAsset").addEventListener("click",function(){site().assets.push({name:"Actif "+(site().assets.length+1),pmax:10,curve:[{load:100,cs:3}],h:zeros24()});markDirty();renderAssets();update();});
+$("assets").addEventListener("input",function(e){
+  var box=e.target.closest(".asset"); if(!box)return; var a=site().assets[+box.dataset.a]; if(!a)return;
+  if(e.target.dataset.pt!==undefined&&e.target.dataset.f){a.curve[+e.target.dataset.pt][e.target.dataset.f]=num(e.target.value);markDirty();}
+  else if(e.target.dataset.h!==undefined){a.h[+e.target.dataset.h]=num(e.target.value);e.target.classList.toggle("on",num(e.target.value)>0);}
+  else if(e.target.dataset.k){a[e.target.dataset.k]=e.target.dataset.k==="name"?e.target.value:num(e.target.value);markDirty();}
+  else return;
+  update();
+});
+$("assets").addEventListener("click",function(e){
+  var act=e.target.dataset&&e.target.dataset.act; if(!act)return;
+  var box=e.target.closest(".asset"), ai=+box.dataset.a, a=site().assets[ai];
+  if(act==="del"){site().assets.splice(ai,1);markDirty();}
+  else if(act==="clear"){a.h=zeros24();}
+  else if(act==="addpt"){var last=a.curve[a.curve.length-1]||{load:100,cs:3};a.curve.push({load:50,cs:last.cs});markDirty();}
+  else if(act==="delpt"){if(a.curve.length>1){a.curve.splice(+e.target.dataset.pt,1);markDirty();}}
+  else if(act==="fill"){var f=+$("af"+ai).value,t=+$("at"+ai).value,p=num($("aw"+ai).value);for(var i=f;i<t;i++)a.h[i]=p;}
+  renderAssets();update();
+});
+
+/* --- paramétrage partagé (base de l'artefact) --- */
+var dbDoc=null, dbState="loading", dirty=false, saving=false, remote=null, lastSig="";
+function sharedOut(){
+  return {sites:S.sites.map(function(s){return {name:String(s.name),li:String(s.li),ntr:num(s.ntr),hmax:num(s.hmax),
+      assets:s.assets.map(function(a){return {name:String(a.name),pmax:num(a.pmax),start:num(a.start),curve:(a.curve||[]).map(function(q){return {load:num(q.load),cs:num(q.cs)};})};})};}),
+    tcs:num(S.tcs),tcr:num(S.tcr),tcl:num(S.tcl),to:String(S.to),cc:String(S.cc)};
+}
+function applyShared(d){
+  if(!d||!Array.isArray(d.sites)||!d.sites.length)return;
+  var old=S.sites, curLi=site()?site().li:null;
+  S.sites=d.sites.slice(0,50).map(function(s){
+    var li=String(s.li==null?"":s.li), prev=old.filter(function(o){return String(o.li)===li;})[0];
+    return {name:String(s.name==null?"":s.name),li:li,ntr:num(s.ntr),hmax:num(s.hmax)>0?num(s.hmax):"",exD:prev?num(prev.exD):0,exH:prev?num(prev.exH):0,
+      assets:(Array.isArray(s.assets)?s.assets:[]).slice(0,30).map(function(a,j){
+        var pa=prev&&prev.assets[j];
+        var cv=(Array.isArray(a.curve)?a.curve:[]).slice(0,12).map(function(q){return {load:num(q&&q.load),cs:num(q&&q.cs)};});
+        if(!cv.length)cv=[{load:100,cs:3}];
+        return {name:String(a.name==null?"":a.name),pmax:num(a.pmax),start:Math.max(0,num(a.start)),curve:cv,h:(pa&&pa.h&&pa.h.length===24)?pa.h:zeros24()};})};
+  });
+  ["tcs","tcr","tcl"].forEach(function(k){if(typeof d[k]==="number"&&isFinite(d[k]))S[k]=d[k];});
+  ["to","cc"].forEach(function(k){if(typeof d[k]==="string")S[k]=d[k];});
+  var idx=-1; S.sites.forEach(function(s,i){if(idx<0&&s.li===curLi)idx=i;}); S.cur=idx<0?0:idx;
+  renderInputs(); renderSite(); update();
+}
+function renderShare(){
+  var bar=$("shareBar"), m=$("shareMsg"), canWrite=dbDoc&&dbState!=="readonly"&&dbState!=="none"&&dbState!=="login";
+  bar.classList.toggle("dirty",dirty);
+  $("shareSave").disabled=!(dirty&&canWrite)||saving; $("shareUndo").disabled=!dirty||saving;
+  if(saving)m.textContent="Enregistrement…";
+  else if(dbState==="none")m.textContent="Base partagée non configurée : le paramétrage reste local à ce navigateur (URL et clé à renseigner dans « administration »).";
+  else if(dbState==="login")m.textContent="Connectez-vous avec votre adresse e-mail professionnelle pour charger le paramétrage partagé (paramétrage local affiché en attendant).";
+  else if(dbState==="readonly")m.textContent="Vous n'avez pas le droit de modifier le paramétrage partagé (clé refusée par la base). Vos modifications restent locales.";
+  else if(dirty)m.textContent="Paramétrage modifié, pas encore enregistré pour les autres utilisateurs.";
+  else if(dbState==="late")m.textContent="Base partagée injoignable pour l'instant : paramétrage local affiché, peut-être pas à jour.";
+  else if(dbState==="loading")m.textContent="Paramétrage partagé : chargement…";
+  else if(dbState==="empty")m.textContent="Aucun paramétrage partagé enregistré. Vérifiez les valeurs puis enregistrez-les pour tous.";
+  else m.textContent="Paramétrage partagé à jour.";
+}
+function markDirty(){ if(!dirty){dirty=true;} renderShare(); }
+$("shareSave").addEventListener("click",function(){
+  if(!dbDoc||saving)return; saving=true; renderShare();
+  var out=sharedOut();
+  dbDoc.set(out).then(function(){saving=false;dirty=false;remote=out;dbState="ok";renderShare();},
+    function(e){saving=false; if(e&&(e.code==="invalid_argument"||e.code==="revoked"||e.code==="not_granted"))dbState="readonly"; renderShare();
+      if(dbState!=="readonly")$("shareMsg").textContent="Enregistrement impossible pour l'instant ("+((e&&e.code)||"erreur")+"). Réessayez dans un moment.";});
+});
+$("shareUndo").addEventListener("click",function(){ dirty=false; if(remote){lastSig=JSON.stringify(remote);applyShared(remote);} renderShare(); });
+/* Base partagée : table Supabase capa_gaz_config (id text, data jsonb), accès réservé aux utilisateurs connectés @novawatt.com.
+   URL et clé publique (anon) peuvent être renseignées ici une fois pour toutes ; la clé anon est publique par conception, la sécurité repose sur les règles RLS. */
+var CFG={url:"https://deypekqncbnxsvryyyza.supabase.co",key:"sb_publishable_-prhVX5Gj22pswgx1UiesQ_W1SLMIRO",table:"capa_gaz_config",domain:"novawatt.com"};
+try{var c0=JSON.parse(localStorage.getItem("capagaz.sb")||"null"); if(c0&&c0.url&&c0.key&&!CFG.url){CFG.url=c0.url;CFG.key=c0.key;}}catch(e){}
+$("sbUrl").value=CFG.url; $("sbKey").value=CFG.key;
+var SES=null;
+try{SES=JSON.parse(localStorage.getItem("capagaz.ses")||"null");}catch(e){}
+function base(){return CFG.url.replace(/\/+$/,"");}
+function saveSes(){try{if(SES)localStorage.setItem("capagaz.ses",JSON.stringify(SES));else localStorage.removeItem("capagaz.ses");}catch(e){}}
+function setSes(j){SES={access_token:j.access_token,refresh_token:j.refresh_token,expires_at:Math.floor(Date.now()/1000)+(+j.expires_in||3600),email:(j.user&&j.user.email)||(SES&&SES.email)||""};
+  if(!SES.email){try{SES.email=JSON.parse(atob(j.access_token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).email||"";}catch(e){}}
+  saveSes();}
+/* retour du lien magique : #access_token=...&refresh_token=...&expires_in=... */
+(function(){
+  if(location.hash.indexOf("access_token=")<0)return;
+  var q={}; location.hash.slice(1).split("&").forEach(function(kv){var i=kv.indexOf("="); if(i>0)q[kv.slice(0,i)]=decodeURIComponent(kv.slice(i+1));});
+  if(q.access_token){setSes(q);}
+  try{history.replaceState(null,"",location.pathname+location.search);}catch(e){}
+})();
+function authFetch(path,body){
+  return fetch(base()+"/auth/v1/"+path,{method:"POST",headers:{apikey:CFG.key,"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){if(!r.ok){var e=new Error(j.msg||j.error_description||j.message||("HTTP "+r.status));e.status=r.status;throw e;}return j;});});
+}
+function refreshSes(){
+  if(!SES||!SES.refresh_token)return Promise.reject(new Error("no session"));
+  return authFetch("token?grant_type=refresh_token",{refresh_token:SES.refresh_token}).then(setSes);
+}
+function ensureSes(){
+  if(!SES)return Promise.reject(new Error("no session"));
+  if(SES.expires_at-60>Date.now()/1000)return Promise.resolve();
+  return refreshSes();
+}
+function authMsg(t){$("authMsg").textContent=t;}
+function renderAuth(){
+  var configured=!!(CFG.url&&CFG.key);
+  $("loginBox").style.display=(configured&&!SES)?"block":"none";
+  $("logoutBox").style.display=SES?"flex":"none";
+  $("whoAmI").textContent=SES?("Connecté : "+(SES.email||"")):"";
+}
+function mailOk(m){return new RegExp("^[^@\\s]+@"+CFG.domain.replace(/\./g,"\\.")+"$","i").test(m);}
+$("authSend").addEventListener("click",function(){
+  var m=$("authMail").value.trim().toLowerCase();
+  if(!mailOk(m)){authMsg("Utilisez votre adresse @"+CFG.domain+".");return;}
+  authMsg("Envoi en cours…");
+  authFetch("otp?redirect_to="+encodeURIComponent(location.origin+location.pathname),{email:m,create_user:true}).then(function(){
+    authMsg("Un e-mail vient de vous être envoyé. Cliquez sur le lien (ou saisissez le code à 6 chiffres ci-dessus puis « Valider le code »).");
+  },function(e){authMsg("Envoi impossible : "+e.message);});
+});
+$("authVerify").addEventListener("click",function(){
+  var m=$("authMail").value.trim().toLowerCase(), t=$("authCode").value.trim();
+  if(!mailOk(m)||!t){authMsg("Saisissez votre adresse e-mail et le code reçu.");return;}
+  authFetch("verify",{type:"email",email:m,token:t}).then(function(j){setSes(j);authMsg("");renderAuth();dbState="loading";renderShare();loadShared();},
+    function(e){authMsg("Code refusé : "+e.message);});
+});
+$("authOut").addEventListener("click",function(){SES=null;saveSes();dbDoc=null;dbState="login";renderAuth();renderShare();});
+function sb(method,query,body,retried){
+  return ensureSes().then(function(){
+    return fetch(base()+"/rest/v1/"+CFG.table+query,{method:method,
+      headers:{apikey:CFG.key,Authorization:"Bearer "+SES.access_token,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},
+      body:body?JSON.stringify(body):undefined});
+  }).then(function(r){
+    if(r.status===401&&!retried){return refreshSes().then(function(){return sb(method,query,body,true);});}
+    if(!r.ok){var e=new Error("HTTP "+r.status); e.code=(r.status===401||r.status===403)?"invalid_argument":"http_"+r.status; throw e;}
+    return method==="GET"?r.json():null;});
+}
+function loadShared(){
+  renderAuth();
+  if(!CFG.url||!CFG.key){dbDoc=null;dbState="none";renderShare();return;}
+  if(!SES){dbDoc=null;dbState="login";renderShare();return;}
+  dbDoc={set:function(out){return sb("POST","",{id:"main",data:out,updated_at:new Date().toISOString()});}};
+  sb("GET","?id=eq.main&select=data").then(function(rows){
+    if(!rows||!rows.length){dbState="empty";dirty=true;renderShare();return;}
+    remote=rows[0].data; dbState="ok"; var sig=JSON.stringify(remote);
+    if(!dirty&&!saving&&sig!==lastSig){lastSig=sig;applyShared(remote);}
+    renderShare();
+  }).catch(function(e){
+    if(e&&e.code==="invalid_argument"){dbState="login";SES=null;saveSes();renderAuth();}
+    else if(e&&e.message==="no session"||e&&/refresh|invalid/i.test(e.message||"")){SES=null;saveSes();dbState="login";renderAuth();}
+    else dbState="late";
+    renderShare();});
+}
+$("sbGo").addEventListener("click",function(){
+  CFG.url=$("sbUrl").value.trim(); CFG.key=$("sbKey").value.trim();
+  try{localStorage.setItem("capagaz.sb",JSON.stringify({url:CFG.url,key:CFG.key}));}catch(e){}
+  dbState="loading"; renderShare(); loadShared();
+});
+loadShared();
+setInterval(function(){if(dbDoc&&!dirty&&!saving&&!document.hidden)loadShared();},60000);
+
+/* --- ouverture d'un nouveau message Outlook --- */
+var wasOver=false;
+function status(kind,html){$("status").innerHTML='<div class="note '+kind+'">'+html+'</div>';}
+function addrs(s){return String(s).split(/[;,\s]+/).map(function(x){return x.trim();}).filter(function(x){return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x);});}
+$("draft").addEventListener("click",function(){
+  var r=compute(); if(r.over)return;
+  if(r.addD<=0&&r.totH<=0){status("warn","Rien à demander : saisissez un programme de marche.");return;}
+  var mp=mailParts(r);
+  var text=$("mail").innerText.replace(/^.*\n/,"").replace(/\t/g," | ");
+  var url="https://outlook.office.com/mail/deeplink/compose?to="+encodeURIComponent(addrs(S.to).join(";"))+"&cc="+encodeURIComponent(addrs(S.cc).join(";"))+"&subject="+encodeURIComponent(mp.subject)+"&body="+encodeURIComponent(text);
+  var w=null; try{w=window.open(url,"_blank","noopener");}catch(e){}
+  status("ok","Nouveau message ouvert dans Outlook web avec destinataires et objet. Le tableau y est en texte brut : pour le tableau mis en forme, cliquez « Copier le mail mis en forme » et collez-le dans le corps du message. "+'<a href="'+esc(url)+'" target="_blank" rel="noopener">Rouvrir le message</a>');
+});
+$("copy").addEventListener("click",function(){
+  if(compute().over)return;
+  var node=$("mail"), done=function(){status("ok","Mail copié. Collez-le dans un nouveau message Outlook.");};
+  var fallback=function(){
+    try{var sel=window.getSelection(),rg=document.createRange();rg.selectNodeContents(node);sel.removeAllRanges();sel.addRange(rg);
+      var ok=document.execCommand("copy");sel.removeAllRanges(); if(ok)done(); else throw new Error("copy");}
+    catch(e){status("warn","Copie automatique impossible : sélectionnez l'aperçu ci-dessus et copiez-le.");}
+  };
+  try{
+    var mp=mailParts(compute());
+    var html=mp.body.replace(/<table>/,'<table border="1" cellpadding="6" style="border-collapse:collapse">');
+    if(navigator.clipboard&&window.ClipboardItem){
+      navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([node.innerText],{type:"text/plain"})})]).then(done,fallback);
+    }else fallback();
+  }catch(e){fallback();}
+});
+
+renderInputs(); renderSite(); update(); renderShare();
+})();
+</script>
+</body>
+</html>
