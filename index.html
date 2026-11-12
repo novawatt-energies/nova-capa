@@ -174,14 +174,23 @@ table.sum tr.total td{font-weight:700;border-bottom:0}
         </div>
         <div id="loginBox" style="margin-top:10px;display:none">
           <div class="fields">
-            <label class="f">Adresse e-mail professionnelle<input type="text" id="authMail" placeholder="prenom.nom@novawatt.com" autocomplete="email"></label>
-            <label class="f">Code reçu par e-mail (si le lien ne s'ouvre pas)<input type="text" id="authCode" placeholder="123456" autocomplete="one-time-code"></label>
+            <label class="f">Adresse e-mail professionnelle<input type="text" id="authMail" placeholder="prenom.nom@novawatt.com" autocomplete="username"></label>
+            <label class="f">Mot de passe<input type="password" id="authPwd" autocomplete="current-password"></label>
           </div>
           <div class="row" style="margin-top:10px">
-            <button type="button" class="primary" id="authSend">Recevoir un lien de connexion</button>
-            <button type="button" class="ghost" id="authVerify">Valider le code</button>
+            <button type="button" class="primary" id="authLogin">Se connecter</button>
           </div>
           <p class="hint" id="authMsg"></p>
+          <details style="margin-top:6px">
+            <summary>Connexion par lien envoyé par e-mail (secours)</summary>
+            <div class="fields">
+              <label class="f">Code reçu par e-mail (si le lien ne s'ouvre pas)<input type="text" id="authCode" placeholder="123456" autocomplete="one-time-code"></label>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <button type="button" id="authSend">Recevoir un lien de connexion</button>
+              <button type="button" class="ghost" id="authVerify">Valider le code</button>
+            </div>
+          </details>
         </div>
         <div class="row" id="logoutBox" style="margin-top:10px;display:none"><span class="hint" id="whoAmI"></span><button type="button" class="ghost" id="authOut">Se déconnecter</button></div>
         <details style="margin-top:10px">
@@ -762,6 +771,17 @@ function renderAuth(){
   if(AUTHERR&&!SES){authMsg("Connexion refusée : "+AUTHERR+". Le lien est à usage unique et expire vite ; demandez-en un nouveau et ouvrez-le dans le même navigateur que cette page. Si votre messagerie ouvre les liens avant vous, utilisez le code à 6 chiffres.");}
 }
 function mailOk(m){return new RegExp("^[^@\\s]+@"+CFG.domain.replace(/\./g,"\\.")+"$","i").test(m);}
+function doLogin(){
+  var m=$("authMail").value.trim().toLowerCase(), pw=$("authPwd").value;
+  if(!mailOk(m)){authMsg("Utilisez votre adresse @"+CFG.domain+".");return;}
+  if(!pw){authMsg("Saisissez votre mot de passe.");return;}
+  authMsg("Connexion…");
+  authFetch("token?grant_type=password",{email:m,password:pw}).then(function(j){
+    setSes(j); $("authPwd").value=""; authMsg(""); AUTHERR=""; renderAuth(); dbState="loading"; renderShare(); loadShared();
+  },function(e){authMsg(/invalid|credential/i.test(e.message)?"Adresse ou mot de passe incorrect.":"Connexion impossible : "+e.message);});
+}
+$("authLogin").addEventListener("click",doLogin);
+$("authPwd").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin();});
 $("authSend").addEventListener("click",function(){
   var m=$("authMail").value.trim().toLowerCase();
   if(!mailOk(m)){authMsg("Utilisez votre adresse @"+CFG.domain+".");return;}
