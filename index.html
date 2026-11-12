@@ -667,7 +667,7 @@ setInterval(function(){
 },60000);
 
 /* --- paramétrage partagé (base de l'artefact) --- */
-var dbDoc=null, dbState="loading", dirty=false, saving=false, remote=null, lastSig="", shareNote="";
+var dbDoc=null, dbState="loading", dirty=false, saving=false, remote=null, lastSig="", shareNote="", denyMsg="";
 function canon(o){if(Array.isArray(o))return "["+o.map(canon).join(",")+"]";if(o&&typeof o==="object")return "{"+Object.keys(o).sort().map(function(k){return JSON.stringify(k)+":"+canon(o[k]);}).join(",")+"}";return JSON.stringify(o);}
 function sharedOut(){
   return {sites:S.sites.map(function(s){return {name:String(s.name),li:String(s.li),ntr:num(s.ntr),hmax:num(s.hmax),
@@ -696,13 +696,14 @@ function applyShared(d){
   UI={}; renderInputs(); renderSite(); update();
 }
 function renderShare(){
-  var bar=$("shareBar"), m=$("shareMsg"), canWrite=dbDoc&&dbState!=="readonly"&&dbState!=="none"&&dbState!=="login";
+  var bar=$("shareBar"), m=$("shareMsg"), canWrite=dbDoc&&dbState!=="readonly"&&dbState!=="none"&&dbState!=="login"&&dbState!=="denied";
   bar.classList.toggle("dirty",dirty);
   $("shareSave").disabled=!(dirty&&canWrite)||saving; $("shareUndo").disabled=!dirty||saving;
   var who=SES?("Connecté : "+(SES.email||"adresse inconnue")+". "):"";
   if(saving)m.textContent="Enregistrement…";
   else if(dbState==="none")m.textContent="Base partagée non configurée : le paramétrage reste local à ce navigateur (URL et clé à renseigner dans « administration »).";
   else if(dbState==="login")m.textContent="Connectez-vous avec votre adresse e-mail professionnelle pour charger le paramétrage partagé (paramétrage local affiché en attendant).";
+  else if(dbState==="denied")m.textContent="Connecté, mais la base refuse l'accès au paramétrage partagé ("+denyMsg+"). Exécutez le script SQL complet (règles d'accès et droits) dans Supabase.";
   else if(dbState==="readonly")m.textContent="Vous n'avez pas le droit de modifier le paramétrage partagé (clé refusée par la base). Vos modifications restent locales.";
   else if(dirty)m.textContent="Paramétrage modifié, pas encore enregistré pour les autres utilisateurs.";
   else if(dbState==="late")m.textContent="Base partagée injoignable pour l'instant : paramétrage local affiché, peut-être pas à jour.";
@@ -804,7 +805,7 @@ function sb(method,query,body,retried){
       body:body?JSON.stringify(body):undefined});
   }).then(function(r){
     if(r.status===401&&!retried){return refreshSes().then(function(){return sb(method,query,body,true);});}
-    if(!r.ok){return r.text().then(function(t){var d=""; try{var j=JSON.parse(t);d=j.message||j.hint||"";}catch(x){} var e=new Error("HTTP "+r.status+(d?" : "+d:"")); e.code=(r.status===401||r.status===403)?"invalid_argument":"http_"+r.status; throw e;});}
+    if(!r.ok){return r.text().then(function(t){var d=""; try{var j=JSON.parse(t);d=j.message||j.hint||"";}catch(x){} var e=new Error("HTTP "+r.status+(d?" : "+d:"")); e.http=r.status; e.code=(r.status===401||r.status===403)?"invalid_argument":"http_"+r.status; throw e;});}
     return method==="GET"?r.json():null;});
 }
 function loadShared(){
@@ -818,8 +819,9 @@ function loadShared(){
     if(!dirty&&!saving&&sig!==lastSig){lastSig=sig;applyShared(remote);}
     renderShare();
   }).catch(function(e){
-    if(e&&e.code==="invalid_argument"){dbState="login";SES=null;saveSes();renderAuth();}
-    else if(e&&e.message==="no session"||e&&/refresh|invalid/i.test(e.message||"")){SES=null;saveSes();dbState="login";renderAuth();}
+    var msg=(e&&e.message)||"";
+    if(e&&e.http&&e.http<500){dbState="denied";denyMsg=msg;}
+    else if(msg==="no session"||(e&&e.status&&e.status>=400&&e.status<500)){SES=null;saveSes();dbState="login";renderAuth();}
     else dbState="late";
     renderShare();});
 }
