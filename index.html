@@ -214,11 +214,14 @@ table.sum tr.total td{font-weight:700;border-bottom:0}
           <label class="f">Marge de sécurité (%)
             <input type="number" id="margin" min="0" max="50" step="1">
           </label>
-          <label class="f">Pointe gaz : moyenne glissante sur (heures)
+          <label class="f">Max quadrihoraire : moyenne glissante sur (heures)
             <input type="number" id="peakWin" min="1" max="24" step="1">
           </label>
+          <label class="f">Tolérance de dépassement horaire (% de la capacité souscrite)
+            <input type="number" id="tolH" min="0" max="50" step="1">
+          </label>
         </div>
-        <p class="hint">Gaz (MWh PCS) = puissance électrique × consommation spécifique à la charge, calculé au quart d'heure et interpolé entre les points saisis (valeur du point le plus proche en dehors), plus le gaz de démarrage ajouté à l'heure du début de chaque séquence de marche (une marche dès 6h compte comme un démarrage). La pointe gaz est la moyenne quadri-horaire la plus élevée : moyenne du gaz horaire (quatre quarts d'heure additionnés, démarrage inclus) sur 4 heures consécutives glissantes de la journée gazière ; mettez 1 pour une pointe sur l'heure seule. Les quantités demandées sont arrondies au MWh supérieur. Un nouveau jour reprend le programme du jour précédent.</p>
+        <p class="hint">Gaz (MWh PCS) = puissance électrique × consommation spécifique à la charge, calculé au quart d'heure et interpolé entre les points saisis (valeur du point le plus proche en dehors), plus le gaz de démarrage ajouté à l'heure du début de chaque séquence de marche (une marche dès 6h compte comme un démarrage). Le max quadrihoraire est la moyenne du gaz horaire (quatre quarts d'heure additionnés, démarrage inclus) la plus élevée sur 4 heures consécutives glissantes de la journée gazière ; mettez 1 pour un maximum sur l'heure seule. Règle : il n'y a pas de dépassement de capacité horaire tant que la consommation réalisée (max quadrihoraire) reste inférieure à 110 % de la capacité horaire souscrite, d'où une capacité horaire à demander égale au max quadrihoraire divisé par 1,10. Les quantités demandées sont arrondies au MWh supérieur. Un nouveau jour reprend le programme du jour précédent.</p>
       </section>
 
       <section>
@@ -257,10 +260,11 @@ table.sum tr.total td{font-weight:700;border-bottom:0}
         <h2>Capacité à demander</h2>
         <div class="tiles">
           <div class="tile"><div class="k">Consommation de la journée</div><div class="v" id="oDay">0</div><div class="u">MWh PCS</div></div>
-          <div class="tile"><div class="k">Pointe gaz (moyenne glissante)</div><div class="v" id="oPeak">0</div><div class="u" id="oPeakSub">MWh PCS/h</div></div>
+          <div class="tile"><div class="k">Max quadrihoraire</div><div class="v" id="oPeak">0</div><div class="u" id="oPeakSub">MWh PCS/h</div></div>
           <div class="tile key"><div class="k">Capa journalière additionnelle</div><div class="v" id="oAddD">+0</div><div class="u">MWh/j</div></div>
           <div class="tile key"><div class="k">Capa horaire totale à demander</div><div class="v" id="oTotH">0</div><div class="u" id="oTotHsub">MWh/h</div></div>
         </div>
+        <p class="hint" id="tolHint"></p>
         <div class="note bad" id="limWarn" hidden></div>
         <div class="chart" id="chart"></div>
         <div class="axis" id="axis"></div>
@@ -380,7 +384,7 @@ function defaults(){
     cur:0, cd:0,
     sites:[{name:"NovaWatt Haubourdin",li:"0343",ntr:3,hmax:144.45,
       assets:[{name:"Haubourdin 45 MW",pmax:45,start:0,curve:[{load:100,cs:3.21}]}],days:[d]}],
-    margin:0, peakWin:4,
+    margin:0, peakWin:4, tolH:10,
     tcs:127.80, tcr:99.12, tcl:39.44,
     reason:"tests performed", sign:"", zeros:1,
     to:"gasdispatching.ch@axpo.com; AxpoFR-FOSUPPORT@AXPO.COM",
@@ -436,7 +440,7 @@ function csAt(a,p){ // consommation spécifique (MWh PCS/MWh élec) à la puissa
   for(var i=1;i<c.length;i++){ if(l<=c[i].load){var d=c[i].load-c[i-1].load; return d>0?c[i-1].cs+(l-c[i-1].load)/d*(c[i].cs-c[i-1].cs):c[i].cs;} }
   return c[c.length-1].cs;
 }
-/* Programme au quart d'heure (MW) -> gaz par quart d'heure ; la pointe est celle de l'heure civile la plus chargée (somme des 4 quarts + gaz de démarrage). */
+/* Programme au quart d'heure (MW) -> gaz par quart d'heure ; le max quadrihoraire est la plus forte moyenne glissante sur 4 heures du gaz horaire (somme des 4 quarts + gaz de démarrage). */
 function dayCalc(st,dy){
   var gasQ=zerosQ(), gasH=zeros24(), elec=0, starts=0, k;
   st.assets.forEach(function(a,ai){
@@ -454,7 +458,7 @@ function dayCalc(st,dy){
   var m=1+num(S.margin)/100;
   var addD=Math.ceil(Math.max(0,dayGas*m-num(dy.exD))-1e-9);
   var incl=addD/20;
-  var needH=Math.max(0,peak*m-num(dy.exH));
+  var needH=Math.max(0,peak*m/(1+Math.max(0,num(S.tolH,10))/100)-num(dy.exH));
   var totH=Math.ceil(Math.max(needH,incl)-1e-9);
   var supH=Math.max(0,totH-incl);
   var d=parseDate(dy.date), coef=d?monthCoef(d.getMonth()+1):0;
@@ -556,7 +560,7 @@ function renderSite(){
   renderDays(); renderAssets();
 }
 function renderInputs(){
-  ["margin","peakWin","tcs","tcr","tcl","reason","sign","zeros","to","cc"].forEach(function(k){$(k).value=S[k];});
+  ["margin","peakWin","tolH","tcs","tcr","tcl","reason","sign","zeros","to","cc"].forEach(function(k){$(k).value=S[k];});
 }
 function update(){
   var st=site(), dy=day(), all=computeAll(), r=all.list[S.cd];
@@ -567,7 +571,9 @@ function update(){
   $("oDay").textContent=fmt(r.day,1); $("oPeak").textContent=fmt(r.peak,1);
   $("oAddD").textContent="+"+fmt(r.addD); $("oTotH").textContent=fmt(r.totH);
   $("oTotHsub").textContent="MWh/h = "+fmt(r.incl,1)+" inclus (1/20) + "+fmt(r.supH,1)+" de supplément";
-  $("oPeakSub").textContent=r.peak>0?"MWh PCS/h, moyenne sur "+r.win+" h ("+pad(HOURS[r.peakIdx])+"h–"+pad((HOURS[r.peakIdx]+r.win)%24)+"h) · pointe sur 1 h : "+fmt(r.peak1h,1):"MWh PCS/h";
+  var tol=Math.max(0,num(S.tolH,10));
+  $("tolHint").textContent="Pas de dépassement de capacité horaire tant que le max quadrihoraire reste sous "+fmt(100+tol)+" % de la capacité souscrite : capacité horaire totale demandée = max quadrihoraire"+(num(S.margin)>0?" (avec marge)":"")+" ÷ "+fmt(1+tol/100,2)+", soit "+fmt(r.peak*(1+num(S.margin)/100)/(1+tol/100),1)+" MWh/h"+(num(dy.exH)>0?" moins "+fmt(num(dy.exH))+" déjà souscrits":"")+".";
+  $("oPeakSub").textContent=r.peak>0?"MWh PCS/h, moyenne sur "+r.win+" h ("+pad(HOURS[r.peakIdx])+"h–"+pad((HOURS[r.peakIdx]+r.win)%24)+"h) · max sur 1 h : "+fmt(r.peak1h,1):"MWh PCS/h";
   var top=Math.max(r.totH,r.peak1h,r.lim,1);
   var lw=$("limWarn"); lw.hidden=!all.over;
   var overDays=all.list.map(function(x,i){return x.over?(parseDate(st.days[i].date)?dm(parseDate(st.days[i].date)):"?"):null;}).filter(Boolean);
@@ -598,16 +604,16 @@ function update(){
   w.hidden=!msg; w.textContent=msg;
   var sumT=0, sumD=0, sumH=0;
   var rows=all.list.map(function(x,i){var c=x.cD+x.cH; sumT+=c; var dt=x.date; return '<tr><td>'+(dt?DAYS_FR[dt.getDay()]+" "+dm(dt):"?")+(st.days[i].sn?" <small>(+"+num(st.days[i].snLvl,20)+" %)</small>":"")+'</td><td>'+fmt(x.day,1)+'</td><td>'+fmt(x.peak,1)+'</td><td>+'+fmt(x.addD)+'</td><td>'+fmt(x.totH)+'</td><td>'+eur(c)+'</td></tr>';}).join("");
-  $("daysSum").innerHTML=all.list.length>1?'<table class="sum"><thead><tr><th>Jour</th><th>Conso MWh</th><th>Pointe MWh/h</th><th>Capa j. +</th><th>Capa h tot.</th><th>Prix</th></tr></thead><tbody>'+rows+'<tr class="total"><td>Total</td><td></td><td></td><td></td><td></td><td>'+eur(sumT)+'</td></tr></tbody></table>':"";
+  $("daysSum").innerHTML=all.list.length>1?'<table class="sum"><thead><tr><th>Jour</th><th>Conso MWh</th><th>Max 4 h MWh/h</th><th>Capa j. +</th><th>Capa h tot.</th><th>Prix</th></tr></thead><tbody>'+rows+'<tr class="total"><td>Total</td><td></td><td></td><td></td><td></td><td>'+eur(sumT)+'</td></tr></tbody></table>':"";
   var mp=mailParts(all);
   $("mail").innerHTML='<div class="subj">'+esc(mp.subject)+'</div>'+mp.body;
   save();
 }
 
 /* --- événements --- */
-var SHARED_KEYS={tcs:1,tcr:1,tcl:1,to:1,cc:1};
+var SHARED_KEYS={tcs:1,tcr:1,tcl:1,tolH:1,to:1,cc:1};
 function bind(id,key,isNum){ $(id).addEventListener("input",function(e){S[key]=isNum?num(e.target.value):e.target.value;if(SHARED_KEYS[key])markDirty();update();}); }
-bind("margin","margin",true); bind("peakWin","peakWin",true); bind("tcs","tcs",true); bind("tcr","tcr",true); bind("tcl","tcl",true);
+bind("margin","margin",true); bind("peakWin","peakWin",true); bind("tolH","tolH",true); bind("tcs","tcs",true); bind("tcr","tcr",true); bind("tcl","tcl",true);
 bind("reason","reason"); bind("sign","sign"); bind("zeros","zeros",true); bind("to","to"); bind("cc","cc");
 $("gd").addEventListener("input",function(e){
   var v=e.target.value; if(!parseDate(v))return; var dy=day(); dy.date=v; if(!dy.snManual)applyAuto(dy);
@@ -672,7 +678,7 @@ function canon(o){if(Array.isArray(o))return "["+o.map(canon).join(",")+"]";if(o
 function sharedOut(){
   return {sites:S.sites.map(function(s){return {name:String(s.name),li:String(s.li),ntr:num(s.ntr),hmax:num(s.hmax),
       assets:s.assets.map(function(a){return {name:String(a.name),pmax:num(a.pmax),start:num(a.start),curve:(a.curve||[]).map(function(q){return {load:num(q.load),cs:num(q.cs)};})};})};}),
-    tcs:num(S.tcs),tcr:num(S.tcr),tcl:num(S.tcl),to:String(S.to),cc:String(S.cc)};
+    tcs:num(S.tcs),tcr:num(S.tcr),tcl:num(S.tcl),tolH:num(S.tolH),to:String(S.to),cc:String(S.cc)};
 }
 function applyShared(d){
   if(!d||!Array.isArray(d.sites)||!d.sites.length)return;
@@ -689,7 +695,7 @@ function applyShared(d){
     }):[newDay(todayStr(),assets.length)];
     return {name:String(s.name==null?"":s.name),li:li,ntr:num(s.ntr),hmax:num(s.hmax)>0?num(s.hmax):"",assets:assets,days:days};
   });
-  ["tcs","tcr","tcl"].forEach(function(k){if(typeof d[k]==="number"&&isFinite(d[k]))S[k]=d[k];});
+  ["tcs","tcr","tcl","tolH"].forEach(function(k){if(typeof d[k]==="number"&&isFinite(d[k]))S[k]=d[k];});
   ["to","cc"].forEach(function(k){if(typeof d[k]==="string")S[k]=d[k];});
   var idx=-1; S.sites.forEach(function(s,i){if(idx<0&&s.li===curLi)idx=i;}); S.cur=idx<0?0:idx;
   if(S.cd>=site().days.length)S.cd=0;
