@@ -111,6 +111,16 @@ table.price small{display:block;color:var(--muted);font-size:12px}
 details summary{cursor:pointer;color:var(--muted);font-size:13px}
 details[open] summary{margin-bottom:10px}
 a{color:var(--accent)}
+.daybar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+button.daybtn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+table.hours input.mix{border-style:dashed}
+table.hours tbody th{text-align:right;padding-right:4px;font-weight:400}
+details.qd{margin-top:2px}
+table.sum{width:100%;border-collapse:collapse;font-size:13px}
+table.sum th,table.sum td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+table.sum th:first-child,table.sum td:first-child{text-align:left}
+table.sum th{font-weight:500;color:var(--muted)}
+table.sum tr.total td{font-weight:700;border-bottom:0}
 </style>
 </head>
 <body>
@@ -124,6 +134,7 @@ a{color:var(--accent)}
     <div class="col">
       <section>
         <h2>Site et journée gazière</h2>
+        <div class="daybar" id="dayBar"></div>
         <div class="fields">
           <label class="f">Site
             <select id="siteSel"></select>
@@ -137,7 +148,7 @@ a{color:var(--accent)}
           <label class="f">NTR du point de livraison
             <input type="number" id="siteNtr" min="0" max="10" step="1">
           </label>
-          <label class="f">Journée gazière (6h → 6h)
+          <label class="f">Journée gazière sélectionnée (6h → 6h)
             <input type="date" id="gd">
           </label>
           <label class="f">Limite de capa horaire du LI (MWh/h, vide = aucune)
@@ -181,11 +192,11 @@ a{color:var(--accent)}
           </div>
           <div class="row" style="margin-top:10px"><button type="button" id="sbGo">Enregistrer</button></div>
         </details>
-        <p class="hint">Sites, actifs, courbes de consommation, NTR, limite horaire, grille tarifaire et destinataires sont communs à tous les utilisateurs. Le programme horaire, la journée et les capacités déjà souscrites ce jour-là restent propres à chacun.</p>
+        <p class="hint">Sites, actifs, courbes de consommation, NTR, limite horaire, grille tarifaire et destinataires sont communs à tous les utilisateurs. Les jours, les programmes et les capacités déjà souscrites restent propres à chacun.</p>
       </section>
 
       <section>
-        <h2>Actifs et programme horaire (MW électriques)</h2>
+        <h2>Actifs et programme (MW électriques) <span id="progDay"></span></h2>
         <div id="assets"></div>
         <div class="row" style="margin-top:12px">
           <button type="button" id="addAsset">Ajouter un actif</button>
@@ -194,18 +205,23 @@ a{color:var(--accent)}
           <label class="f">Marge de sécurité (%)
             <input type="number" id="margin" min="0" max="50" step="1">
           </label>
+          <label class="f">Pointe gaz : moyenne glissante sur (heures)
+            <input type="number" id="peakWin" min="1" max="24" step="1">
+          </label>
         </div>
-        <p class="hint">Gaz (MWh PCS) = puissance électrique × consommation spécifique à la charge de l'heure, interpolée entre les points saisis (valeur du point le plus proche en dehors), plus le gaz de démarrage ajouté à la première heure de chaque séquence de marche (une marche dès 6h compte comme un démarrage). Les quantités demandées sont arrondies au MWh supérieur.</p>
+        <p class="hint">Gaz (MWh PCS) = puissance électrique × consommation spécifique à la charge, calculé au quart d'heure et interpolé entre les points saisis (valeur du point le plus proche en dehors), plus le gaz de démarrage ajouté à l'heure du début de chaque séquence de marche (une marche dès 6h compte comme un démarrage). La pointe gaz est la moyenne quadri-horaire la plus élevée : moyenne du gaz horaire (quatre quarts d'heure additionnés, démarrage inclus) sur 4 heures consécutives glissantes de la journée gazière ; mettez 1 pour une pointe sur l'heure seule. Les quantités demandées sont arrondies au MWh supérieur. Un nouveau jour reprend le programme du jour précédent.</p>
       </section>
 
       <section>
-        <h2>Préavis</h2>
+        <h2>Préavis (journée sélectionnée)</h2>
         <label class="check"><input type="checkbox" id="sn"> <span>Capacité journalière prise en <b>préavis court</b></span></label>
         <div class="radio-set" id="snSet">
           <label class="check"><input type="radio" name="snLvl" id="sn20" value="20"> <span>Demande après J-2 ouvré 9h et avant J-1 20h : tarif +20 %</span></label>
           <label class="check"><input type="radio" name="snLvl" id="sn30" value="30"> <span>Demande après J-1 20h et jusqu'à J 14h : tarif +30 %</span></label>
         </div>
-        <p class="hint">Jusqu'à J-2 ouvré 9h, le tarif normal s'applique. Une capacité souscrite le jour J prend effet à 6h.</p>
+        <p class="hint" id="snNote"></p>
+        <div class="row"><button type="button" class="ghost" id="snAutoBtn" hidden>Revenir au réglage automatique</button></div>
+        <p class="hint">Jusqu'à J-2 ouvré 9h, le tarif normal s'applique. Une capacité souscrite le jour J prend effet à 6h. Le réglage s'applique à la journée sélectionnée.</p>
       </section>
 
       <section>
@@ -232,7 +248,7 @@ a{color:var(--accent)}
         <h2>Capacité à demander</h2>
         <div class="tiles">
           <div class="tile"><div class="k">Consommation de la journée</div><div class="v" id="oDay">0</div><div class="u">MWh PCS</div></div>
-          <div class="tile"><div class="k">Pointe horaire</div><div class="v" id="oPeak">0</div><div class="u">MWh PCS/h</div></div>
+          <div class="tile"><div class="k">Pointe gaz (moyenne glissante)</div><div class="v" id="oPeak">0</div><div class="u" id="oPeakSub">MWh PCS/h</div></div>
           <div class="tile key"><div class="k">Capa journalière additionnelle</div><div class="v" id="oAddD">+0</div><div class="u">MWh/j</div></div>
           <div class="tile key"><div class="k">Capa horaire totale à demander</div><div class="v" id="oTotH">0</div><div class="u" id="oTotHsub">MWh/h</div></div>
         </div>
@@ -252,6 +268,7 @@ a{color:var(--accent)}
           </tbody>
         </table>
         <div class="note warn" id="tarifWarn" hidden></div>
+        <div id="daysSum" style="margin-top:12px"></div>
       </section>
 
       <section>
@@ -293,7 +310,8 @@ a{color:var(--accent)}
 <script>
 (function(){
 "use strict";
-var KEY="capagaz.v2";
+var KEY="capagaz.v3";
+var NQ=96;
 var HOURS=[]; for(var i=0;i<24;i++){HOURS.push((i+6)%24);}
 var pad=function(n){return (n<10?"0":"")+n;};
 var $=function(id){return document.getElementById(id);};
@@ -302,28 +320,96 @@ var num=function(v,d){var x=parseFloat(String(v).replace(",","."));return isFini
 var fmt=function(x,d){return x.toLocaleString("fr-FR",{minimumFractionDigits:d||0,maximumFractionDigits:d||0});};
 var eur=function(x){return fmt(x,x<100?2:0)+" €";};
 
-function tomorrow(){var d=new Date();d.setDate(d.getDate()+1);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());}
+/* --- heure de Paris, jours ouvrés français, délais de préavis --- */
+function parisNow(){
+  var f=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
+  var o={}; f.formatToParts(new Date()).forEach(function(p){o[p.type]=p.value;});
+  return {y:+o.year,m:+o.month,d:+o.day,h:+o.hour,mi:+o.minute};
+}
+function todayStr(){var n=parisNow();return n.y+"-"+pad(n.m)+"-"+pad(n.d);}
+function addDays(str,k){var p=str.split("-");var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]+k));return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate());}
+function easter(y){
+  var a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),
+      h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+      mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;
+  return Date.UTC(y,mo-1,da);
+}
+var holCache={};
+function holidays(y){
+  if(holCache[y])return holCache[y];
+  var s={}, D=86400000;
+  function add(t){var d=new Date(t);s[d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate())]=1;}
+  [[1,1],[5,1],[5,8],[7,14],[8,15],[11,1],[11,11],[12,25]].forEach(function(x){add(Date.UTC(y,x[0]-1,x[1]));});
+  var e=easter(y); add(e+D); add(e+39*D); add(e+50*D);
+  return holCache[y]=s;
+}
+function isBiz(str){var p=str.split("-"),w=new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).getUTCDay();return w!==0&&w!==6&&!holidays(+p[0])[str];}
+function prevBiz(str,n){var s=str;while(n>0){s=addDays(s,-1);if(isBiz(s))n--;}return s;}
+function stamp(str,h,mi){var p=str.split("-");return Date.UTC(+p[0],+p[1]-1,+p[2],h,mi||0);}
+/* Préavis court d'après l'heure de la demande : après J-2 ouvré 9h +20 %, après J-1 20h +30 %, au-delà de J 14h hors délai. */
+function autoSn(dateStr){
+  var n=parisNow(), now=Date.UTC(n.y,n.m-1,n.d,n.h,n.mi);
+  var t1=stamp(prevBiz(dateStr,2),9,0), t2=stamp(addDays(dateStr,-1),20,0), t3=stamp(dateStr,14,0);
+  if(now<t1)return {sn:false,lvl:20,late:false};
+  if(now<t2)return {sn:true,lvl:20,late:false};
+  return {sn:true,lvl:30,late:now>=t3};
+}
+function applyAuto(d){var au=autoSn(d.date);d.sn=au.sn;d.snLvl=au.lvl;}
+
 function zeros24(){var a=[];for(var i=0;i<24;i++)a.push(0);return a;}
+function zerosQ(){var a=[];for(var i=0;i<NQ;i++)a.push(0);return a;}
+function qLabel(k){var m=(360+k*15)%1440;return pad(Math.floor(m/60))+":"+pad(m%60);}
+function expand(h){var q=[];for(var i=0;i<24;i++)for(var j=0;j<4;j++)q.push(num(h[i]));return q;}
+function newDay(date,n,from){
+  var q=[]; for(var i=0;i<n;i++)q.push(from&&from.q&&from.q[i]?from.q[i].slice():zerosQ());
+  var d={date:date,exD:0,exH:0,sn:false,snLvl:20,snManual:false,q:q}; applyAuto(d); return d;
+}
 function defaults(){
-  var h=zeros24(); h[2]=45; h[3]=45; h[4]=45; // 8h-11h, exemple
+  var q=zerosQ(); for(var k=8;k<20;k++)q[k]=45; // 8h-11h, exemple
+  var t=todayStr(), d={date:t,exD:0,exH:0,sn:false,snLvl:20,snManual:false,q:[q]}; applyAuto(d);
   return {
-    cur:0,
-    sites:[{name:"NovaWatt Haubourdin",li:"0343",ntr:3,hmax:144.45,exD:0,exH:0,
-      assets:[{name:"Haubourdin 45 MW",pmax:45,start:0,curve:[{load:100,cs:3.21}],h:h}]}],
-    gd:tomorrow(), margin:0, sn:false, snLvl:20,
+    cur:0, cd:0,
+    sites:[{name:"NovaWatt Haubourdin",li:"0343",ntr:3,hmax:144.45,
+      assets:[{name:"Haubourdin 45 MW",pmax:45,start:0,curve:[{load:100,cs:3.21}]}],days:[d]}],
+    margin:0, peakWin:4,
     tcs:127.80, tcr:99.12, tcl:39.44,
     reason:"tests performed", sign:"", zeros:1,
     to:"gasdispatching.ch@axpo.com; AxpoFR-FOSUPPORT@AXPO.COM",
     cc:"Businessinvestigation.ch@axpo.com; guillaume.dupret@novawatt.com; charles.jacob@novawatt.com; marketops@novawatt.com; kevin.debode@novawatt.com; tristan.amirault@axpo.com; Louis.Chesneau@axpo.com; remi.sirand@axpo.com; Julya.Podgorna@axpo.com; axpo_balancing@axpo.com; Anne-Sophie.Barla@axpo.com"
   };
 }
+function migrate(o){ /* ancien format : un seul jour, programme horaire dans l'actif */
+  var t=todayStr();
+  o.sites.forEach(function(s){
+    s.assets=s.assets||[];
+    s.assets.forEach(function(a){ if(!a.curve||!a.curve.length)a.curve=[{load:100,cs:3}]; });
+    if(!s.days||!s.days.length){
+      s.days=[{date:o.gd||t,exD:num(s.exD),exH:num(s.exH),sn:false,snLvl:+o.snLvl===30?30:20,snManual:false,
+        q:s.assets.map(function(a){return (a.h&&a.h.length===24)?expand(a.h):zerosQ();})}];
+    }
+    s.assets.forEach(function(a){delete a.h;});
+    delete s.exD; delete s.exH;
+    s.days.forEach(function(d,i){
+      d.date=addDays(t,i);
+      d.q=s.assets.map(function(a,j){return (d.q&&d.q[j]&&d.q[j].length===NQ)?d.q[j]:zerosQ();});
+      d.exD=num(d.exD); d.exH=num(d.exH); d.snLvl=+d.snLvl===30?30:20;
+      if(!d.snManual)applyAuto(d);
+    });
+  });
+  delete o.gd; delete o.sn; delete o.snLvl;
+  if(o.cd===undefined)o.cd=0;
+}
 var S=defaults();
 try{
-  var raw=localStorage.getItem(KEY);
-  if(raw){var o=JSON.parse(raw); if(o&&o.sites&&o.sites.length){var d=defaults(); for(var k in d){if(o[k]===undefined)o[k]=d[k];} o.gd=tomorrow(); S=o; if(S.cur>=S.sites.length)S.cur=0;}}
-}catch(e){}
+  var raw=localStorage.getItem(KEY)||localStorage.getItem("capagaz.v2");
+  if(raw){var o=JSON.parse(raw); if(o&&o.sites&&o.sites.length){var dd=defaults(); for(var kk in dd){if(o[kk]===undefined)o[kk]=dd[kk];} migrate(o); S=o; if(S.cur>=S.sites.length)S.cur=0;}}
+}catch(e){ S=defaults(); }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 function site(){return S.sites[S.cur];}
+function day(){var st=site(); if(S.cd>=st.days.length||S.cd<0)S.cd=0; return st.days[S.cd];}
+function qOf(dy,ai){if(!dy.q[ai]||dy.q[ai].length!==NQ)dy.q[ai]=zerosQ();return dy.q[ai];}
+var UI={}; // état d'affichage des sélecteurs « de … à … … MW » par actif (conservé entre deux rendus)
+function uiOf(ai){return UI[ai]||(UI[ai]={f:0,t:NQ,w:null,open:false});}
 
 function monthCoef(m){ // m = 1..12, part du terme annuel
   if(m===12||m<=2)return 4/12;
@@ -331,7 +417,7 @@ function monthCoef(m){ // m = 1..12, part du terme annuel
   if(m===7||m===8)return 0.5/12;
   return 1/12;
 }
-function gdDate(){var p=String(S.gd||"").split("-");if(p.length!==3)return null;var d=new Date(+p[0],+p[1]-1,+p[2]);return isNaN(d)?null:d;}
+function parseDate(s){var p=String(s||"").split("-");if(p.length!==3)return null;var d=new Date(+p[0],+p[1]-1,+p[2]);return isNaN(d)?null:d;}
 
 function csAt(a,p){ // consommation spécifique (MWh PCS/MWh élec) à la puissance p
   var pm=num(a.pmax), c=(a.curve||[]).filter(function(q){return num(q.cs)>0;}).map(function(q){return {load:num(q.load),cs:num(q.cs)};}).sort(function(x,y){return x.load-y.load;});
@@ -341,46 +427,66 @@ function csAt(a,p){ // consommation spécifique (MWh PCS/MWh élec) à la puissa
   for(var i=1;i<c.length;i++){ if(l<=c[i].load){var d=c[i].load-c[i-1].load; return d>0?c[i-1].cs+(l-c[i-1].load)/d*(c[i].cs-c[i-1].cs):c[i].cs;} }
   return c[c.length-1].cs;
 }
-function compute(){
-  var st=site(), gasH=zeros24(), elec=0, starts=0;
-  st.assets.forEach(function(a){
-    for(var i=0;i<24;i++){var p=Math.max(0,num(a.h[i])); elec+=p; gasH[i]+=p*csAt(a,p);
-      if(p>0&&(i===0||num(a.h[i-1])<=0)){gasH[i]+=Math.max(0,num(a.start));starts++;}}
+/* Programme au quart d'heure (MW) -> gaz par quart d'heure ; la pointe est celle de l'heure civile la plus chargée (somme des 4 quarts + gaz de démarrage). */
+function dayCalc(st,dy){
+  var gasQ=zerosQ(), gasH=zeros24(), elec=0, starts=0, k;
+  st.assets.forEach(function(a,ai){
+    var q=qOf(dy,ai), s0=Math.max(0,num(a.start));
+    for(k=0;k<NQ;k++){
+      var p=Math.max(0,num(q[k])); elec+=p*0.25; gasQ[k]+=p*csAt(a,p)*0.25;
+      if(p>0&&(k===0||num(q[k-1])<=0)){gasH[Math.floor(k/4)]+=s0;starts++;}
+    }
   });
-  var day=gasH.reduce(function(s,x){return s+x;},0), peak=Math.max.apply(null,gasH);
+  for(k=0;k<NQ;k++)gasH[Math.floor(k/4)]+=gasQ[k];
+  var dayGas=gasH.reduce(function(s,x){return s+x;},0);
+  var win=Math.max(1,Math.min(24,Math.round(num(S.peakWin,4)))), peak=0, peakIdx=0, i0, j0;
+  for(i0=0;i0+win<=24;i0++){var sm=0; for(j0=0;j0<win;j0++)sm+=gasH[i0+j0]; if(sm/win>peak+1e-12){peak=sm/win;peakIdx=i0;}}
+  var peak1h=Math.max.apply(null,gasH);
   var m=1+num(S.margin)/100;
-  var addD=Math.ceil(Math.max(0,day*m-num(st.exD))-1e-9);
+  var addD=Math.ceil(Math.max(0,dayGas*m-num(dy.exD))-1e-9);
   var incl=addD/20;
-  var needH=Math.max(0,peak*m-num(st.exH));
+  var needH=Math.max(0,peak*m-num(dy.exH));
   var totH=Math.ceil(Math.max(needH,incl)-1e-9);
   var supH=Math.max(0,totH-incl);
-  var d=gdDate(), coef=d?monthCoef(d.getMonth()+1):0;
-  var sn=S.sn?(1+num(S.snLvl,20)/100):1;
+  var d=parseDate(dy.date), coef=d?monthCoef(d.getMonth()+1):0;
+  var sn=dy.sn?(1+num(dy.snLvl,20)/100):1;
   var reg=num(S.tcr)*num(st.ntr);
   var uD=(num(S.tcs)+reg+num(S.tcl))*coef/30;
   var uH=10*(num(S.tcl)+reg)*coef/30;
-  var lim=num(st.hmax), liH=num(st.exH)+totH;
-  return {starts:starts,lim:lim,liH:liH,over:lim>0&&liH>lim+1e-9,isNew:num(st.exD)===0&&num(st.exH)===0,
-    gasH:gasH,day:day,peak:peak,elec:elec,addD:addD,incl:incl,totH:totH,supH:supH,coef:coef,
+  var lim=num(st.hmax), liH=num(dy.exH)+totH;
+  return {starts:starts,lim:lim,liH:liH,over:lim>0&&liH>lim+1e-9,isNew:num(dy.exD)===0&&num(dy.exH)===0,
+    gasH:gasH,day:dayGas,peak:peak,peak1h:peak1h,win:win,peakIdx:peakIdx,elec:elec,addD:addD,incl:incl,totH:totH,supH:supH,coef:coef,
     uD:uD*sn,uH:uH*sn,cD:addD*uD*sn,cH:supH*uH*sn,base:addD*uD+supH*uH,sn:sn,date:d};
+}
+function computeAll(){
+  var st=site(), list=st.days.map(function(dy){return dayCalc(st,dy);});
+  return {list:list,over:list.some(function(r){return r.over;}),isNew:list.every(function(r){return r.isNew;}),
+    anyReq:list.some(function(r){return r.addD>0||r.totH>0;})};
 }
 
 var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+var DAYS_FR=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
 function dm(d){return pad(d.getDate())+"/"+pad(d.getMonth()+1);}
-function mailParts(r){
-  var st=site(), d=r.date||new Date();
+function mailParts(all){
+  var st=site(), list=all.list;
   var label=esc(st.name)+" (LI "+esc(st.li)+")";
-  var subject="Daily and Hourly Capacity Request for "+st.name+" (LI "+st.li+") for GD "+dm(d)+"/"+d.getFullYear()+(r.isNew?" (NEW!)":"");
-  var rows=[[label,"<b>"+DAYS[d.getDay()]+" "+dm(d)+"</b>","<b>+"+r.addD+"</b>","<b>"+r.totH+"</b>"]];
+  var ds=list.map(function(r){return r.date||new Date();});
+  var first=ds[0], last=ds[ds.length-1];
+  var full=function(d){return DAYS[d.getDay()]+" "+dm(d);};
+  var sd=ds.length>1?dm(first)+"/"+first.getFullYear()+" to "+dm(last)+"/"+last.getFullYear():dm(first)+"/"+first.getFullYear();
+  var subject="Daily and Hourly Capacity Request for "+st.name+" (LI "+st.li+") for GD "+sd+(all.isNew?" (NEW!)":"");
+  var rows=list.map(function(r,i){return [label,"<b>"+full(ds[i])+"</b>","<b>+"+r.addD+"</b>","<b>"+(r.totH>0?r.totH:"+0")+"</b>"];});
   for(var i=1;i<=Math.min(4,Math.max(0,Math.round(num(S.zeros))));i++){
-    var n=new Date(d.getFullYear(),d.getMonth(),d.getDate()+i);
-    rows.push([label,"<b>"+DAYS[n.getDay()]+" "+dm(n)+"</b>","<b>+0</b>","<b>+0</b>"]);
+    var n=new Date(last.getFullYear(),last.getMonth(),last.getDate()+i);
+    rows.push([label,"<b>"+full(n)+"</b>","<b>+0</b>","<b>+0</b>"]);
   }
+  var gds=ds.map(function(d){return "<b>"+full(d)+"/"+d.getFullYear()+"</b>";});
+  var gdText=gds.length>1?gds.slice(0,-1).join(", ")+" and "+gds[gds.length-1]:gds[0];
   var head=["Site","Gas Day","Additional Daily Capacity MWh/d 0 deg C","<b>TOTAL</b> Hourly Capacity MWh/h 0 deg C (<b><i>if different from daily/20</i></b>)"];
   var table="<table><thead><tr>"+head.map(function(h){return "<th>"+h+"</th>";}).join("")+"</tr></thead><tbody>"+
     rows.map(function(rw){return "<tr>"+rw.map(function(c){return "<td>"+c+"</td>";}).join("")+"</tr>";}).join("")+"</tbody></table>";
   var body="<p>Dear all,</p>"+
-    "<p>NovaWatt needs to book an additional daily and hourly capacity to cover the consumption of "+esc(S.reason)+" on GD <b>"+DAYS[d.getDay()]+" "+dm(d)+"/"+d.getFullYear()+"</b> on LI"+esc(st.li)+".</p>"+
+    "<p>NovaWatt needs to book an additional daily and hourly capacity to cover the consumption of "+esc(S.reason)+" on GD"+(gds.length>1?"s":"")+" "+gdText+" on LI"+esc(st.li)+".</p>"+
     "<p>Consequently, I ask you to book the following additional daily and hourly capacity:</p>"+
     "<p>For the sake of clarity the last column is the <b>TOTAL HOURLY CAPACITY needed for the corresponding GD (1/20 of Daily + additional hourly)</b></p>"+
     table+
@@ -390,11 +496,18 @@ function mailParts(r){
   return {subject:subject,body:body};
 }
 
+function hourAvg(q,i){return (q[4*i]+q[4*i+1]+q[4*i+2]+q[4*i+3])/4;}
+function hourMixed(q,i){return !(q[4*i]===q[4*i+1]&&q[4*i]===q[4*i+2]&&q[4*i]===q[4*i+3]);}
+function r2(x){return Math.round(x*100)/100;}
 function renderAssets(){
-  var st=site();
+  var st=site(), dy=day();
   $("assets").innerHTML=st.assets.map(function(a,ai){
-    var opts=HOURS.map(function(h,i){return '<option value="'+i+'">'+pad(h)+'h</option>';}).join("");
-    var optsEnd=HOURS.map(function(h,i){return '<option value="'+(i+1)+'"'+(i===23?" selected":"")+'>'+pad((h+1)%24)+'h</option>';}).join("");
+    var ui=uiOf(ai), w=(ui.w===null||ui.w===undefined)?a.pmax:ui.w, q=qOf(dy,ai), k, i, m;
+    var opts="", optsEnd="";
+    for(k=0;k<NQ;k++)opts+='<option value="'+k+'"'+(k===ui.f?" selected":"")+'>'+qLabel(k)+'</option>';
+    for(k=1;k<=NQ;k++)optsEnd+='<option value="'+k+'"'+(k===ui.t?" selected":"")+'>'+qLabel(k)+'</option>';
+    var hourRow=""; for(i=0;i<24;i++){var av=hourAvg(q,i); hourRow+='<td><input type="number" id="h'+ai+'_'+i+'" data-h="'+i+'" min="0" step="0.1" value="'+r2(av)+'" class="'+(av>0?"on":"")+(hourMixed(q,i)?" mix":"")+'" aria-label="MW de '+pad(HOURS[i])+'h à '+pad((HOURS[i]+1)%24)+'h"></td>';}
+    var qrows=""; for(m=0;m<4;m++){qrows+='<tr><th>:'+pad(m*15)+'</th>'; for(i=0;i<24;i++){var v=q[i*4+m]; qrows+='<td><input type="number" id="q'+ai+'_'+(i*4+m)+'" data-q="'+(i*4+m)+'" min="0" step="0.1" value="'+v+'" class="'+(v>0?"on":"")+'" aria-label="MW de '+qLabel(i*4+m)+'"></td>';} qrows+='</tr>';}
     return '<div class="asset" data-a="'+ai+'">'+
       '<div class="asset-head">'+
         '<label class="f">Actif<input type="text" id="an'+ai+'" data-k="name" value="'+esc(a.name)+'"></label>'+
@@ -402,44 +515,59 @@ function renderAssets(){
         '<label class="f">Gaz par démarrage (MWh PCS)<input type="number" id="ag'+ai+'" data-k="start" min="0" step="0.1" value="'+esc(num(a.start))+'"></label>'+
         '<button type="button" class="ghost" data-act="del" aria-label="Supprimer cet actif">Supprimer</button>'+
       '</div>'+
-      '<div class="row fill curve">Consommation spécifique : '+(a.curve||[]).map(function(q,qi){
-        return '<span class="row">à <input type="number" id="cl'+ai+'_'+qi+'" data-pt="'+qi+'" data-f="load" min="0" max="110" step="1" value="'+esc(q.load)+'" aria-label="Charge en %"> % : <input type="number" id="cc'+ai+'_'+qi+'" data-pt="'+qi+'" data-f="cs" min="0" step="0.01" value="'+esc(q.cs)+'" aria-label="MWh PCS par MWh électrique"> MWh PCS/MWh'+
-          ((a.curve.length>1)?' <button type="button" class="ghost" data-act="delpt" data-pt="'+qi+'" aria-label="Supprimer ce point">×</button>':'')+'</span>';
+      '<div class="row fill curve">Consommation spécifique : '+(a.curve||[]).map(function(c,ci){
+        return '<span class="row">à <input type="number" id="cl'+ai+'_'+ci+'" data-pt="'+ci+'" data-f="load" min="0" max="110" step="1" value="'+esc(c.load)+'" aria-label="Charge en %"> % : <input type="number" id="cc'+ai+'_'+ci+'" data-pt="'+ci+'" data-f="cs" min="0" step="0.01" value="'+esc(c.cs)+'" aria-label="MWh PCS par MWh électrique"> MWh PCS/MWh'+
+          ((a.curve.length>1)?' <button type="button" class="ghost" data-act="delpt" data-pt="'+ci+'" aria-label="Supprimer ce point">×</button>':'')+'</span>';
       }).join("")+' <button type="button" data-act="addpt">Ajouter un point de charge</button></div>'+
-      '<div class="row fill">De <select id="af'+ai+'" aria-label="Heure de début">'+opts+'</select> à <select id="at'+ai+'" aria-label="Heure de fin">'+optsEnd+'</select> à <input type="number" id="aw'+ai+'" min="0" step="0.1" value="'+esc(a.pmax)+'" aria-label="Puissance en MW"> MW '+
-        '<button type="button" data-act="fill">Appliquer</button><button type="button" class="ghost" data-act="clear">Tout à zéro</button>'+
+      '<div class="row fill">De <select id="af'+ai+'" data-ui="f" aria-label="Début">'+opts+'</select> à <select id="at'+ai+'" data-ui="t" aria-label="Fin">'+optsEnd+'</select> à <input type="number" id="aw'+ai+'" data-ui="w" min="0" step="0.1" value="'+esc(w)+'" aria-label="Puissance en MW"> MW '+
+        '<button type="button" data-act="fill">Appliquer</button><button type="button" class="ghost" data-act="clear">Tout à zéro (ce jour)</button>'+
         '<span id="as'+ai+'"></span></div>'+
-      '<div class="scroll"><table class="hours"><thead><tr>'+HOURS.map(function(h){return "<th>"+pad(h)+"</th>";}).join("")+'</tr></thead><tbody><tr>'+
-        a.h.map(function(v,i){return '<td><input type="number" id="h'+ai+'_'+i+'" data-h="'+i+'" min="0" step="0.1" value="'+esc(v)+'" class="'+(num(v)>0?"on":"")+'" aria-label="MW de '+pad(HOURS[i])+'h à '+pad((HOURS[i]+1)%24)+'h"></td>';}).join("")+
-      '</tr></tbody></table></div>'+
+      '<div class="scroll"><table class="hours"><thead><tr>'+HOURS.map(function(h){return "<th>"+pad(h)+"</th>";}).join("")+'</tr></thead><tbody><tr>'+hourRow+'</tr></tbody></table></div>'+
+      '<details class="qd" data-ai="'+ai+'"'+(ui.open?" open":"")+'><summary>Détail au quart d\'heure</summary><div class="scroll"><table class="hours"><thead><tr><th></th>'+HOURS.map(function(h){return "<th>"+pad(h)+"</th>";}).join("")+'</tr></thead><tbody>'+qrows+'</tbody></table></div></details>'+
     '</div>';
   }).join("");
+}
+function syncHour(ai,i){
+  var q=qOf(day(),ai), el=$("h"+ai+"_"+i); if(!el||document.activeElement===el)return;
+  var av=hourAvg(q,i); el.value=r2(av); el.classList.toggle("on",av>0); el.classList.toggle("mix",hourMixed(q,i));
+}
+function renderDays(){
+  var st=site(), dy=day();
+  $("dayBar").innerHTML=st.days.map(function(d,i){var dt=parseDate(d.date);return '<button type="button" class="daybtn'+(i===S.cd?" on":"")+'" data-day="'+i+'">'+(dt?DAYS_FR[dt.getDay()]+" "+dm(dt):"?")+'</button>';}).join("")+
+    '<button type="button" data-act2="addday">Ajouter un jour</button><button type="button" class="ghost" data-act2="delday"'+(st.days.length<2?" disabled":"")+'>Supprimer ce jour</button>';
+  $("gd").value=dy.date; $("exD").value=dy.exD; $("exH").value=dy.exH;
+  $("sn").checked=!!dy.sn; $("sn20").checked=+dy.snLvl!==30; $("sn30").checked=+dy.snLvl===30;
+  var dt=parseDate(dy.date); $("progDay").textContent=dt?"— "+DAYS_FR[dt.getDay()]+" "+dm(dt)+"/"+dt.getFullYear():"";
 }
 function renderSite(){
   var st=site();
   $("siteSel").innerHTML=S.sites.map(function(s,i){return '<option value="'+i+'"'+(i===S.cur?" selected":"")+'>'+esc(s.name)+' (LI '+esc(s.li)+')</option>';}).join("");
-  $("siteName").value=st.name; $("siteLi").value=st.li; $("siteNtr").value=st.ntr; $("siteHmax").value=(st.hmax===undefined||st.hmax===null||num(st.hmax)<=0)?"":st.hmax; $("exD").value=st.exD; $("exH").value=st.exH;
+  $("siteName").value=st.name; $("siteLi").value=st.li; $("siteNtr").value=st.ntr; $("siteHmax").value=(st.hmax===undefined||st.hmax===null||num(st.hmax)<=0)?"":st.hmax;
   $("delSite").disabled=S.sites.length<2;
-  renderAssets();
+  renderDays(); renderAssets();
 }
 function renderInputs(){
-  ["gd","margin","tcs","tcr","tcl","reason","sign","zeros","to","cc"].forEach(function(k){$(k).value=S[k];});
-  $("sn").checked=!!S.sn;
-  $("sn20").checked=+S.snLvl!==30; $("sn30").checked=+S.snLvl===30;
+  ["margin","peakWin","tcs","tcr","tcl","reason","sign","zeros","to","cc"].forEach(function(k){$(k).value=S[k];});
 }
 function update(){
-  var st=site(), r=compute();
-  $("snSet").style.display=S.sn?"flex":"none";
+  var st=site(), dy=day(), all=computeAll(), r=all.list[S.cd];
+  $("snSet").style.display=dy.sn?"flex":"none";
+  var au=autoSn(dy.date), n=parisNow();
+  $("snNote").textContent=dy.snManual?"Préavis réglé manuellement.":("Réglé automatiquement d'après la date et l'heure de la demande ("+pad(n.d)+"/"+pad(n.m)+" "+pad(n.h)+":"+pad(n.mi)+", heure de Paris)."+(au.late?" Attention : le délai J 14h de cette journée gazière est dépassé, à vérifier avec le dispatching.":""));
+  $("snAutoBtn").hidden=!dy.snManual;
   $("oDay").textContent=fmt(r.day,1); $("oPeak").textContent=fmt(r.peak,1);
   $("oAddD").textContent="+"+fmt(r.addD); $("oTotH").textContent=fmt(r.totH);
   $("oTotHsub").textContent="MWh/h = "+fmt(r.incl,1)+" inclus (1/20) + "+fmt(r.supH,1)+" de supplément";
-  var top=Math.max(r.totH,r.peak,r.lim,1);
-  var lw=$("limWarn"); lw.hidden=!r.over;
-  if(r.over)lw.textContent="La capacité horaire nécessaire sur le LI ("+fmt(r.liH)+" MWh/h) dépasse la limite du point de livraison ("+fmt(r.lim)+" MWh/h). Le mail est bloqué : réduisez la puissance ou étalez la marche.";
-  $("draft").disabled=r.over; $("copy").disabled=r.over; $("mail").style.opacity=r.over?".45":"";
-  if(r.over)status("bad","Mail bloqué : la demande dépasse la limite de capacité horaire du LI ("+fmt(r.lim)+" MWh/h).");
+  $("oPeakSub").textContent=r.peak>0?"MWh PCS/h, moyenne sur "+r.win+" h ("+pad(HOURS[r.peakIdx])+"h–"+pad((HOURS[r.peakIdx]+r.win)%24)+"h) · pointe sur 1 h : "+fmt(r.peak1h,1):"MWh PCS/h";
+  var top=Math.max(r.totH,r.peak1h,r.lim,1);
+  var lw=$("limWarn"); lw.hidden=!all.over;
+  var overDays=all.list.map(function(x,i){return x.over?(parseDate(st.days[i].date)?dm(parseDate(st.days[i].date)):"?"):null;}).filter(Boolean);
+  var ov=all.list.filter(function(x){return x.over;})[0];
+  if(all.over)lw.textContent="La capacité horaire nécessaire sur le LI ("+fmt(ov.liH)+" MWh/h) dépasse la limite du point de livraison ("+fmt(ov.lim)+" MWh/h) le "+overDays.join(", ")+". Le mail est bloqué : réduisez la puissance ou étalez la marche.";
+  $("draft").disabled=all.over; $("copy").disabled=all.over; $("mail").style.opacity=all.over?".45":"";
+  if(all.over)status("bad","Mail bloqué : la demande dépasse la limite de capacité horaire du LI ("+fmt(ov.lim)+" MWh/h) le "+overDays.join(", ")+".");
   else if(wasOver)$("status").innerHTML="";
-  wasOver=r.over;
+  wasOver=all.over;
   $("chart").innerHTML=r.gasH.map(function(g){return g>0?'<div class="bar" style="height:'+(g/top*100).toFixed(1)+'%" title="'+fmt(g,1)+' MWh/h"></div>':'<div class="bar zero"></div>';}).join("")+
     (r.totH>0?'<div class="cap" style="bottom:'+(r.totH/top*100).toFixed(1)+'%"></div>':"")+
     (r.lim>0?'<div class="lim" style="bottom:'+(r.lim/top*100).toFixed(1)+'%"></div>':"");
@@ -449,17 +577,20 @@ function update(){
     if(el)el.textContent="· pleine charge : "+fmt(pm*csAt(a,pm),1)+" MWh PCS/h";
   });
   var mois=r.date?r.date.toLocaleDateString("fr-FR",{month:"long"}):"";
-  $("snPill").hidden=!S.sn; $("snPill").textContent="préavis court +"+num(S.snLvl,20)+" %";
+  $("snPill").hidden=!dy.sn; $("snPill").textContent="préavis court +"+num(dy.snLvl,20)+" %";
   $("pD").textContent=eur(r.cD); $("pDsub").textContent=fmt(r.addD)+" MWh/j × "+fmt(r.uD,3)+" €/MWh/j (TCS + TCR×NTR + TCL, "+mois+")";
   $("pH").textContent=eur(r.cH); $("pHsub").textContent=fmt(r.supH,1)+" MWh/h × "+fmt(r.uH,3)+" €/MWh/h (10 × (TCL + TCR×NTR))";
   var tot=r.cD+r.cH;
   $("pT").textContent=eur(tot);
   $("pTsub").textContent=(r.day>0?fmt(tot/r.day,2)+" €/MWh PCS consommé · "+fmt(tot/r.elec,2)+" €/MWh électrique":"Aucune heure de marche saisie")+
-    (S.sn&&tot>0?" · dont "+eur(tot-r.base)+" de majoration préavis court":"");
+    (dy.sn&&tot>0?" · dont "+eur(tot-r.base)+" de majoration préavis court":"");
   var w=$("tarifWarn"), msg="";
-  if(r.date){var t=r.date.getTime(); if(t<new Date(2026,3,1).getTime()||t>new Date(2027,2,31).getTime())msg="Cette journée est hors de la grille du 01/04/2026 au 31/03/2027 : mettez à jour TCS, TCR et TCL.";}
+  all.list.forEach(function(x){ if(!msg&&x.date){var t=x.date.getTime(); if(t<new Date(2026,3,1).getTime()||t>new Date(2027,2,31).getTime())msg="Une journée est hors de la grille du 01/04/2026 au 31/03/2027 : mettez à jour TCS, TCR et TCL.";}});
   w.hidden=!msg; w.textContent=msg;
-  var mp=mailParts(r);
+  var sumT=0, sumD=0, sumH=0;
+  var rows=all.list.map(function(x,i){var c=x.cD+x.cH; sumT+=c; var dt=x.date; return '<tr><td>'+(dt?DAYS_FR[dt.getDay()]+" "+dm(dt):"?")+(st.days[i].sn?" <small>(+"+num(st.days[i].snLvl,20)+" %)</small>":"")+'</td><td>'+fmt(x.day,1)+'</td><td>'+fmt(x.peak,1)+'</td><td>+'+fmt(x.addD)+'</td><td>'+fmt(x.totH)+'</td><td>'+eur(c)+'</td></tr>';}).join("");
+  $("daysSum").innerHTML=all.list.length>1?'<table class="sum"><thead><tr><th>Jour</th><th>Conso MWh</th><th>Pointe MWh/h</th><th>Capa j. +</th><th>Capa h tot.</th><th>Prix</th></tr></thead><tbody>'+rows+'<tr class="total"><td>Total</td><td></td><td></td><td></td><td></td><td>'+eur(sumT)+'</td></tr></tbody></table>':"";
+  var mp=mailParts(all);
   $("mail").innerHTML='<div class="subj">'+esc(mp.subject)+'</div>'+mp.body;
   save();
 }
@@ -467,38 +598,68 @@ function update(){
 /* --- événements --- */
 var SHARED_KEYS={tcs:1,tcr:1,tcl:1,to:1,cc:1};
 function bind(id,key,isNum){ $(id).addEventListener("input",function(e){S[key]=isNum?num(e.target.value):e.target.value;if(SHARED_KEYS[key])markDirty();update();}); }
-bind("gd","gd"); bind("margin","margin",true); bind("tcs","tcs",true); bind("tcr","tcr",true); bind("tcl","tcl",true);
+bind("margin","margin",true); bind("peakWin","peakWin",true); bind("tcs","tcs",true); bind("tcr","tcr",true); bind("tcl","tcl",true);
 bind("reason","reason"); bind("sign","sign"); bind("zeros","zeros",true); bind("to","to"); bind("cc","cc");
-$("sn").addEventListener("change",function(e){S.sn=e.target.checked;update();});
-$("sn20").addEventListener("change",function(){S.snLvl=20;update();});
-$("sn30").addEventListener("change",function(){S.snLvl=30;update();});
-function bindSite(id,key,isNum,local){ $(id).addEventListener("input",function(e){site()[key]=isNum?num(e.target.value):e.target.value; if(!isNum){var o=$("siteSel").options[S.cur]; if(o)o.textContent=site().name+" (LI "+site().li+")";} if(!local)markDirty(); update();}); }
-bindSite("siteName","name"); bindSite("siteLi","li"); bindSite("siteNtr","ntr",true); bindSite("siteHmax","hmax",true); bindSite("exD","exD",true,true); bindSite("exH","exH",true,true);
-$("siteSel").addEventListener("change",function(e){S.cur=+e.target.value;renderSite();update();});
-$("addSite").addEventListener("click",function(){S.sites.push({name:"Nouveau site",li:"0000",ntr:1,exD:0,exH:0,hmax:"",assets:[{name:"Actif 1",pmax:10,curve:[{load:100,cs:3}],h:zeros24()}]});S.cur=S.sites.length-1;markDirty();renderSite();update();$("siteName").focus();});
-$("delSite").addEventListener("click",function(){if(S.sites.length<2)return;S.sites.splice(S.cur,1);S.cur=0;markDirty();renderSite();update();});
-$("addAsset").addEventListener("click",function(){site().assets.push({name:"Actif "+(site().assets.length+1),pmax:10,curve:[{load:100,cs:3}],h:zeros24()});markDirty();renderAssets();update();});
+$("gd").addEventListener("input",function(e){
+  var v=e.target.value; if(!parseDate(v))return; var dy=day(); dy.date=v; if(!dy.snManual)applyAuto(dy);
+  renderDays(); update();
+});
+$("exD").addEventListener("input",function(e){day().exD=num(e.target.value);update();});
+$("exH").addEventListener("input",function(e){day().exH=num(e.target.value);update();});
+$("sn").addEventListener("change",function(e){var dy=day();dy.sn=e.target.checked;dy.snManual=true;update();});
+$("sn20").addEventListener("change",function(){var dy=day();dy.snLvl=20;dy.snManual=true;update();});
+$("sn30").addEventListener("change",function(){var dy=day();dy.snLvl=30;dy.snManual=true;update();});
+$("snAutoBtn").addEventListener("click",function(){var dy=day();dy.snManual=false;applyAuto(dy);renderDays();update();});
+function bindSite(id,key,isNum){ $(id).addEventListener("input",function(e){site()[key]=isNum?num(e.target.value):e.target.value; if(!isNum){var o=$("siteSel").options[S.cur]; if(o)o.textContent=site().name+" (LI "+site().li+")";} markDirty(); update();}); }
+bindSite("siteName","name"); bindSite("siteLi","li"); bindSite("siteNtr","ntr",true); bindSite("siteHmax","hmax",true);
+$("siteSel").addEventListener("change",function(e){S.cur=+e.target.value;S.cd=0;UI={};renderSite();update();});
+$("addSite").addEventListener("click",function(){S.sites.push({name:"Nouveau site",li:"0000",ntr:1,hmax:"",assets:[{name:"Actif 1",pmax:10,start:0,curve:[{load:100,cs:3}]}],days:[newDay(todayStr(),1)]});S.cur=S.sites.length-1;S.cd=0;UI={};markDirty();renderSite();update();$("siteName").focus();});
+$("delSite").addEventListener("click",function(){if(S.sites.length<2)return;S.sites.splice(S.cur,1);S.cur=0;S.cd=0;UI={};markDirty();renderSite();update();});
+$("addAsset").addEventListener("click",function(){var st=site();st.assets.push({name:"Actif "+(st.assets.length+1),pmax:10,start:0,curve:[{load:100,cs:3}]});st.days.forEach(function(d){d.q.push(zerosQ());});markDirty();renderAssets();update();});
+$("dayBar").addEventListener("click",function(e){
+  var b=e.target.closest("button"); if(!b)return; var st=site();
+  if(b.dataset.day!==undefined){S.cd=+b.dataset.day;}
+  else if(b.dataset.act2==="addday"){var last=st.days[st.days.length-1]; st.days.push(newDay(addDays(last.date,1),st.assets.length,last)); S.cd=st.days.length-1;}
+  else if(b.dataset.act2==="delday"){if(st.days.length<2)return; st.days.splice(S.cd,1); S.cd=Math.max(0,S.cd-1);}
+  else return;
+  renderDays(); renderAssets(); update();
+});
+$("assets").addEventListener("toggle",function(e){var d=e.target; if(d&&d.classList&&d.classList.contains("qd"))uiOf(+d.dataset.ai).open=d.open;},true);
 $("assets").addEventListener("input",function(e){
-  var box=e.target.closest(".asset"); if(!box)return; var a=site().assets[+box.dataset.a]; if(!a)return;
-  if(e.target.dataset.pt!==undefined&&e.target.dataset.f){a.curve[+e.target.dataset.pt][e.target.dataset.f]=num(e.target.value);markDirty();}
-  else if(e.target.dataset.h!==undefined){a.h[+e.target.dataset.h]=num(e.target.value);e.target.classList.toggle("on",num(e.target.value)>0);}
-  else if(e.target.dataset.k){a[e.target.dataset.k]=e.target.dataset.k==="name"?e.target.value:num(e.target.value);markDirty();}
+  var box=e.target.closest(".asset"); if(!box)return; var ai=+box.dataset.a, st=site(), a=st.assets[ai]; if(!a)return;
+  var t=e.target, dy=day();
+  if(t.dataset.ui){uiOf(ai)[t.dataset.ui]=num(t.value);return;}
+  if(t.dataset.pt!==undefined&&t.dataset.f){a.curve[+t.dataset.pt][t.dataset.f]=num(t.value);markDirty();}
+  else if(t.dataset.h!==undefined){
+    var i=+t.dataset.h, v=Math.max(0,num(t.value)), q=qOf(dy,ai);
+    for(var m=0;m<4;m++){q[i*4+m]=v; var qi=$("q"+ai+"_"+(i*4+m)); if(qi){qi.value=v;qi.classList.toggle("on",v>0);}}
+    t.classList.toggle("on",v>0); t.classList.remove("mix");
+  }
+  else if(t.dataset.q!==undefined){var k=+t.dataset.q; qOf(dy,ai)[k]=Math.max(0,num(t.value)); t.classList.toggle("on",num(t.value)>0); syncHour(ai,Math.floor(k/4));}
+  else if(t.dataset.k){a[t.dataset.k]=t.dataset.k==="name"?t.value:num(t.value);markDirty();}
   else return;
   update();
 });
 $("assets").addEventListener("click",function(e){
   var act=e.target.dataset&&e.target.dataset.act; if(!act)return;
-  var box=e.target.closest(".asset"), ai=+box.dataset.a, a=site().assets[ai];
-  if(act==="del"){site().assets.splice(ai,1);markDirty();}
-  else if(act==="clear"){a.h=zeros24();}
+  var box=e.target.closest(".asset"), ai=+box.dataset.a, st=site(), a=st.assets[ai], dy=day(), ui=uiOf(ai);
+  if($("af"+ai)){ui.f=+$("af"+ai).value;ui.t=+$("at"+ai).value;ui.w=num($("aw"+ai).value);}
+  if(act==="del"){st.assets.splice(ai,1);st.days.forEach(function(d){d.q.splice(ai,1);});UI={};markDirty();}
+  else if(act==="clear"){dy.q[ai]=zerosQ();}
   else if(act==="addpt"){var last=a.curve[a.curve.length-1]||{load:100,cs:3};a.curve.push({load:50,cs:last.cs});markDirty();}
   else if(act==="delpt"){if(a.curve.length>1){a.curve.splice(+e.target.dataset.pt,1);markDirty();}}
-  else if(act==="fill"){var f=+$("af"+ai).value,t=+$("at"+ai).value,p=num($("aw"+ai).value);for(var i=f;i<t;i++)a.h[i]=p;}
+  else if(act==="fill"){var q=qOf(dy,ai);for(var k=ui.f;k<ui.t;k++)q[k]=Math.max(0,ui.w);}
   renderAssets();update();
 });
+/* le préavis automatique suit l'horloge */
+setInterval(function(){
+  var ch=false; site().days.forEach(function(d){ if(!d.snManual){var s=d.sn,l=d.snLvl;applyAuto(d);if(s!==d.sn||l!==d.snLvl)ch=true;} });
+  if(ch)renderDays(); update();
+},60000);
 
 /* --- paramétrage partagé (base de l'artefact) --- */
-var dbDoc=null, dbState="loading", dirty=false, saving=false, remote=null, lastSig="";
+var dbDoc=null, dbState="loading", dirty=false, saving=false, remote=null, lastSig="", shareNote="";
+function canon(o){if(Array.isArray(o))return "["+o.map(canon).join(",")+"]";if(o&&typeof o==="object")return "{"+Object.keys(o).sort().map(function(k){return JSON.stringify(k)+":"+canon(o[k]);}).join(",")+"}";return JSON.stringify(o);}
 function sharedOut(){
   return {sites:S.sites.map(function(s){return {name:String(s.name),li:String(s.li),ntr:num(s.ntr),hmax:num(s.hmax),
       assets:s.assets.map(function(a){return {name:String(a.name),pmax:num(a.pmax),start:num(a.start),curve:(a.curve||[]).map(function(q){return {load:num(q.load),cs:num(q.cs)};})};})};}),
@@ -509,17 +670,21 @@ function applyShared(d){
   var old=S.sites, curLi=site()?site().li:null;
   S.sites=d.sites.slice(0,50).map(function(s){
     var li=String(s.li==null?"":s.li), prev=old.filter(function(o){return String(o.li)===li;})[0];
-    return {name:String(s.name==null?"":s.name),li:li,ntr:num(s.ntr),hmax:num(s.hmax)>0?num(s.hmax):"",exD:prev?num(prev.exD):0,exH:prev?num(prev.exH):0,
-      assets:(Array.isArray(s.assets)?s.assets:[]).slice(0,30).map(function(a,j){
-        var pa=prev&&prev.assets[j];
-        var cv=(Array.isArray(a.curve)?a.curve:[]).slice(0,12).map(function(q){return {load:num(q&&q.load),cs:num(q&&q.cs)};});
-        if(!cv.length)cv=[{load:100,cs:3}];
-        return {name:String(a.name==null?"":a.name),pmax:num(a.pmax),start:Math.max(0,num(a.start)),curve:cv,h:(pa&&pa.h&&pa.h.length===24)?pa.h:zeros24()};})};
+    var assets=(Array.isArray(s.assets)?s.assets:[]).slice(0,30).map(function(a){
+      var cv=(Array.isArray(a.curve)?a.curve:[]).slice(0,12).map(function(q){return {load:num(q&&q.load),cs:num(q&&q.cs)};});
+      if(!cv.length)cv=[{load:100,cs:3}];
+      return {name:String(a.name==null?"":a.name),pmax:num(a.pmax),start:Math.max(0,num(a.start)),curve:cv};});
+    var days=(prev&&prev.days&&prev.days.length)?prev.days.map(function(dy){
+      return {date:dy.date,exD:dy.exD,exH:dy.exH,sn:dy.sn,snLvl:dy.snLvl,snManual:dy.snManual,
+        q:assets.map(function(_,j){return (dy.q&&dy.q[j]&&dy.q[j].length===NQ)?dy.q[j]:zerosQ();})};
+    }):[newDay(todayStr(),assets.length)];
+    return {name:String(s.name==null?"":s.name),li:li,ntr:num(s.ntr),hmax:num(s.hmax)>0?num(s.hmax):"",assets:assets,days:days};
   });
   ["tcs","tcr","tcl"].forEach(function(k){if(typeof d[k]==="number"&&isFinite(d[k]))S[k]=d[k];});
   ["to","cc"].forEach(function(k){if(typeof d[k]==="string")S[k]=d[k];});
   var idx=-1; S.sites.forEach(function(s,i){if(idx<0&&s.li===curLi)idx=i;}); S.cur=idx<0?0:idx;
-  renderInputs(); renderSite(); update();
+  if(S.cd>=site().days.length)S.cd=0;
+  UI={}; renderInputs(); renderSite(); update();
 }
 function renderShare(){
   var bar=$("shareBar"), m=$("shareMsg"), canWrite=dbDoc&&dbState!=="readonly"&&dbState!=="none"&&dbState!=="login";
@@ -533,15 +698,24 @@ function renderShare(){
   else if(dbState==="late")m.textContent="Base partagée injoignable pour l'instant : paramétrage local affiché, peut-être pas à jour.";
   else if(dbState==="loading")m.textContent="Paramétrage partagé : chargement…";
   else if(dbState==="empty")m.textContent="Aucun paramétrage partagé enregistré. Vérifiez les valeurs puis enregistrez-les pour tous.";
-  else m.textContent="Paramétrage partagé à jour.";
+  else m.textContent=shareNote||"Paramétrage partagé à jour.";
 }
-function markDirty(){ if(!dirty){dirty=true;} renderShare(); }
+function markDirty(){ shareNote=""; if(!dirty){dirty=true;} renderShare(); }
 $("shareSave").addEventListener("click",function(){
   if(!dbDoc||saving)return; saving=true; renderShare();
   var out=sharedOut();
-  dbDoc.set(out).then(function(){saving=false;dirty=false;remote=out;dbState="ok";renderShare();},
-    function(e){saving=false; if(e&&(e.code==="invalid_argument"||e.code==="revoked"||e.code==="not_granted"))dbState="readonly"; renderShare();
-      if(dbState!=="readonly")$("shareMsg").textContent="Enregistrement impossible pour l'instant ("+((e&&e.code)||"erreur")+"). Réessayez dans un moment.";});
+  dbDoc.set(out).then(function(){
+    return sb("GET","?id=eq.main&select=data");
+  }).then(function(rows){
+    saving=false; dbState="ok"; var t=new Date(), hh=pad(t.getHours())+":"+pad(t.getMinutes());
+    if(rows&&rows.length&&canon(rows[0].data)===canon(out)){dirty=false;remote=rows[0].data;lastSig=JSON.stringify(remote);shareNote="Enregistré pour tous à "+hh+" (relu depuis la base).";}
+    else if(rows&&rows.length){dirty=true;shareNote="";renderShare();$("shareMsg").textContent="Enregistrement envoyé mais la base contient une autre version : vos modifications ne sont pas prises en compte. Vérifiez les droits d'écriture (script SQL).";return;}
+    else{dirty=true;shareNote="";renderShare();$("shareMsg").textContent="Enregistrement envoyé mais impossible de relire la base : vérifiez les règles d'accès (script SQL).";return;}
+    renderShare();
+  }).catch(function(e){
+    saving=false; var det=(e&&e.message)||"erreur"; if(e&&e.code==="invalid_argument")dbState="readonly"; renderShare();
+    $("shareMsg").textContent="Enregistrement impossible : "+det+(dbState==="readonly"?" — reconnectez-vous avec votre adresse @novawatt.com et vérifiez que le script SQL a été exécuté.":".");
+  });
 });
 $("shareUndo").addEventListener("click",function(){ dirty=false; if(remote){lastSig=JSON.stringify(remote);applyShared(remote);} renderShare(); });
 /* Base partagée : table Supabase capa_gaz_config (id text, data jsonb), accès réservé aux utilisateurs connectés @novawatt.com.
@@ -606,7 +780,7 @@ function sb(method,query,body,retried){
       body:body?JSON.stringify(body):undefined});
   }).then(function(r){
     if(r.status===401&&!retried){return refreshSes().then(function(){return sb(method,query,body,true);});}
-    if(!r.ok){var e=new Error("HTTP "+r.status); e.code=(r.status===401||r.status===403)?"invalid_argument":"http_"+r.status; throw e;}
+    if(!r.ok){return r.text().then(function(t){var d=""; try{var j=JSON.parse(t);d=j.message||j.hint||"";}catch(x){} var e=new Error("HTTP "+r.status+(d?" : "+d:"")); e.code=(r.status===401||r.status===403)?"invalid_argument":"http_"+r.status; throw e;});}
     return method==="GET"?r.json():null;});
 }
 function loadShared(){
@@ -638,16 +812,16 @@ var wasOver=false;
 function status(kind,html){$("status").innerHTML='<div class="note '+kind+'">'+html+'</div>';}
 function addrs(s){return String(s).split(/[;,\s]+/).map(function(x){return x.trim();}).filter(function(x){return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x);});}
 $("draft").addEventListener("click",function(){
-  var r=compute(); if(r.over)return;
-  if(r.addD<=0&&r.totH<=0){status("warn","Rien à demander : saisissez un programme de marche.");return;}
-  var mp=mailParts(r);
+  var all=computeAll(); if(all.over)return;
+  if(!all.anyReq){status("warn","Rien à demander : saisissez un programme de marche.");return;}
+  var mp=mailParts(all);
   var text=$("mail").innerText.replace(/^.*\n/,"").replace(/\t/g," | ");
   var url="https://outlook.office.com/mail/deeplink/compose?to="+encodeURIComponent(addrs(S.to).join(";"))+"&cc="+encodeURIComponent(addrs(S.cc).join(";"))+"&subject="+encodeURIComponent(mp.subject)+"&body="+encodeURIComponent(text);
   var w=null; try{w=window.open(url,"_blank","noopener");}catch(e){}
   status("ok","Nouveau message ouvert dans Outlook web avec destinataires et objet. Le tableau y est en texte brut : pour le tableau mis en forme, cliquez « Copier le mail mis en forme » et collez-le dans le corps du message. "+'<a href="'+esc(url)+'" target="_blank" rel="noopener">Rouvrir le message</a>');
 });
 $("copy").addEventListener("click",function(){
-  if(compute().over)return;
+  if(computeAll().over)return;
   var node=$("mail"), done=function(){status("ok","Mail copié. Collez-le dans un nouveau message Outlook.");};
   var fallback=function(){
     try{var sel=window.getSelection(),rg=document.createRange();rg.selectNodeContents(node);sel.removeAllRanges();sel.addRange(rg);
@@ -655,7 +829,7 @@ $("copy").addEventListener("click",function(){
     catch(e){status("warn","Copie automatique impossible : sélectionnez l'aperçu ci-dessus et copiez-le.");}
   };
   try{
-    var mp=mailParts(compute());
+    var mp=mailParts(computeAll());
     var html=mp.body.replace(/<table>/,'<table border="1" cellpadding="6" style="border-collapse:collapse">');
     if(navigator.clipboard&&window.ClipboardItem){
       navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([node.innerText],{type:"text/plain"})})]).then(done,fallback);
