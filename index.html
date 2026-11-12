@@ -690,6 +690,7 @@ function renderShare(){
   var bar=$("shareBar"), m=$("shareMsg"), canWrite=dbDoc&&dbState!=="readonly"&&dbState!=="none"&&dbState!=="login";
   bar.classList.toggle("dirty",dirty);
   $("shareSave").disabled=!(dirty&&canWrite)||saving; $("shareUndo").disabled=!dirty||saving;
+  var who=SES?("Connecté : "+(SES.email||"adresse inconnue")+". "):"";
   if(saving)m.textContent="Enregistrement…";
   else if(dbState==="none")m.textContent="Base partagée non configurée : le paramétrage reste local à ce navigateur (URL et clé à renseigner dans « administration »).";
   else if(dbState==="login")m.textContent="Connectez-vous avec votre adresse e-mail professionnelle pour charger le paramétrage partagé (paramétrage local affiché en attendant).";
@@ -699,6 +700,7 @@ function renderShare(){
   else if(dbState==="loading")m.textContent="Paramétrage partagé : chargement…";
   else if(dbState==="empty")m.textContent="Aucun paramétrage partagé enregistré. Vérifiez les valeurs puis enregistrez-les pour tous.";
   else m.textContent=shareNote||"Paramétrage partagé à jour.";
+  if(SES&&!saving&&!/^Enregistrement impossible/.test(m.textContent))m.textContent=who+m.textContent;
 }
 function markDirty(){ shareNote=""; if(!dirty){dirty=true;} renderShare(); }
 $("shareSave").addEventListener("click",function(){
@@ -723,7 +725,7 @@ $("shareUndo").addEventListener("click",function(){ dirty=false; if(remote){last
 var CFG={url:"https://deypekqncbnxsvryyyza.supabase.co",key:"sb_publishable_-prhVX5Gj22pswgx1UiesQ_W1SLMIRO",table:"capa_gaz_config",domain:"novawatt.com"};
 try{var c0=JSON.parse(localStorage.getItem("capagaz.sb")||"null"); if(c0&&c0.url&&c0.key&&!CFG.url){CFG.url=c0.url;CFG.key=c0.key;}}catch(e){}
 $("sbUrl").value=CFG.url; $("sbKey").value=CFG.key;
-var SES=null;
+var SES=null, AUTHERR="";
 try{SES=JSON.parse(localStorage.getItem("capagaz.ses")||"null");}catch(e){}
 function base(){return CFG.url.replace(/\/+$/,"");}
 function saveSes(){try{if(SES)localStorage.setItem("capagaz.ses",JSON.stringify(SES));else localStorage.removeItem("capagaz.ses");}catch(e){}}
@@ -732,9 +734,10 @@ function setSes(j){SES={access_token:j.access_token,refresh_token:j.refresh_toke
   saveSes();}
 /* retour du lien magique : #access_token=...&refresh_token=...&expires_in=... */
 (function(){
-  if(location.hash.indexOf("access_token=")<0)return;
+  if(location.hash.indexOf("access_token=")<0&&location.hash.indexOf("error")<0)return;
   var q={}; location.hash.slice(1).split("&").forEach(function(kv){var i=kv.indexOf("="); if(i>0)q[kv.slice(0,i)]=decodeURIComponent(kv.slice(i+1));});
   if(q.access_token){setSes(q);}
+  else if(q.error_description||q.error){AUTHERR=String(q.error_description||q.error).replace(/\+/g," ");}
   try{history.replaceState(null,"",location.pathname+location.search);}catch(e){}
 })();
 function authFetch(path,body){
@@ -756,6 +759,7 @@ function renderAuth(){
   $("loginBox").style.display=(configured&&!SES)?"block":"none";
   $("logoutBox").style.display=SES?"flex":"none";
   $("whoAmI").textContent=SES?("Connecté : "+(SES.email||"")):"";
+  if(AUTHERR&&!SES){authMsg("Connexion refusée : "+AUTHERR+". Le lien est à usage unique et expire vite ; demandez-en un nouveau et ouvrez-le dans le même navigateur que cette page. Si votre messagerie ouvre les liens avant vous, utilisez le code à 6 chiffres.");}
 }
 function mailOk(m){return new RegExp("^[^@\\s]+@"+CFG.domain.replace(/\./g,"\\.")+"$","i").test(m);}
 $("authSend").addEventListener("click",function(){
